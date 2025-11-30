@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { StreamSource, Poll, Session, Survey, Language } from '../types';
+import { StreamSource, Poll, Session, Survey, Language, PlayerSize, HtmlContent } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Settings, BarChart3, Users, AlertTriangle, Eye } from 'lucide-react';
+import { Settings, BarChart3, Users, AlertTriangle, Eye, Maximize2, Monitor, Minimize2 } from 'lucide-react';
 
 interface AdminConsoleProps {
   session: Session;
@@ -10,6 +10,10 @@ interface AdminConsoleProps {
   updatePoll: (p: Poll) => void;
   updateSurvey: (s: Survey) => void;
   lang: Language;
+  playerSize: PlayerSize;
+  setPlayerSize: (size: PlayerSize) => void;
+  htmlContent: HtmlContent | null;
+  setHtmlContent: (content: HtmlContent | null) => void;
 }
 
 // Mock Charts using plain SVG/Divs for simplicity in this demo, but assuming Recharts in full build
@@ -21,8 +25,20 @@ const MiniChart = ({ color }: { color: string }) => (
     </div>
 );
 
-export const AdminConsole: React.FC<AdminConsoleProps> = ({ session, currentSource, setSource, updatePoll, updateSurvey, lang }) => {
+export const AdminConsole: React.FC<AdminConsoleProps> = ({
+    session,
+    currentSource,
+    setSource,
+    updatePoll,
+    updateSurvey,
+    lang,
+    playerSize,
+    setPlayerSize,
+    htmlContent,
+    setHtmlContent
+}) => {
     const t = TRANSLATIONS[lang].admin;
+    const [customHtml, setCustomHtml] = useState('');
 
     return (
         <div className="p-4 md:p-6 h-full overflow-y-auto bg-slate-950 text-slate-200 pb-20 md:pb-6">
@@ -89,6 +105,131 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ session, currentSour
                             ))}
                         </div>
                     </div>
+                </div>
+
+                {/* Player Size Control */}
+                <div className="col-span-12 bg-slate-900 rounded-xl border border-slate-800 p-6">
+                    <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <Monitor className="w-4 h-4" /> {t.playerSizeControl}
+                    </h2>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        {[
+                            { id: PlayerSize.FULL, label: t.fullSize, sub: t.fullSizeDesc, icon: Maximize2 },
+                            { id: PlayerSize.MEDIUM, label: t.mediumSize, sub: t.mediumSizeDesc, icon: Monitor },
+                            { id: PlayerSize.SMALL, label: t.smallSize, sub: t.smallSizeDesc, icon: Minimize2 },
+                        ].map((opt) => (
+                            <button
+                                key={opt.id}
+                                onClick={() => setPlayerSize(opt.id)}
+                                className={`relative p-4 rounded-lg border-2 text-left transition-all ${
+                                    playerSize === opt.id
+                                    ? 'border-indigo-500 bg-indigo-900/20'
+                                    : 'border-slate-800 bg-slate-950 hover:border-slate-700'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                        <opt.icon className={`w-5 h-5 ${playerSize === opt.id ? 'text-indigo-400' : 'text-slate-500'}`} />
+                                        <span className={`font-bold ${playerSize === opt.id ? 'text-white' : 'text-slate-400'}`}>{opt.label}</span>
+                                    </div>
+                                    {playerSize === opt.id && <div className="w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.8)]"></div>}
+                                </div>
+                                <span className="text-xs text-slate-500">{opt.sub}</span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {playerSize !== PlayerSize.FULL && (
+                        <div className="mt-6 pt-6 border-t border-slate-800">
+                            <h3 className="text-sm font-medium mb-3">{t.htmlContentArea}</h3>
+
+                            {/* Sample HTML Content Buttons */}
+                            <div className="flex flex-wrap gap-2 mb-4">
+                                <button
+                                    onClick={() => setHtmlContent({
+                                        id: 'survey-example',
+                                        title: t.sampleSurvey,
+                                        html: `
+                                            <div class="bg-slate-900 p-6 rounded-lg h-full flex flex-col">
+                                                <h3 class="text-xl font-bold text-white mb-4">📊 ${t.quickFeedback}</h3>
+                                                <p class="text-slate-300 mb-6">${t.surveyQuestion}</p>
+                                                <div class="space-y-3 flex-1">
+                                                    <button class="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-medium transition-colors">⭐⭐⭐⭐⭐ ${t.excellent}</button>
+                                                    <button class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-medium transition-colors">⭐⭐⭐⭐ ${t.good}</button>
+                                                    <button class="w-full bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded-lg font-medium transition-colors">⭐⭐⭐ ${t.average}</button>
+                                                    <button class="w-full bg-orange-600 hover:bg-orange-500 text-white py-3 rounded-lg font-medium transition-colors">⭐⭐ ${t.poor}</button>
+                                                </div>
+                                            </div>
+                                        `,
+                                        isActive: true
+                                    })}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                                >
+                                    {t.loadSurvey}
+                                </button>
+                                <button
+                                    onClick={() => setHtmlContent({
+                                        id: 'ad-example',
+                                        title: t.sampleAd,
+                                        html: `
+                                            <div class="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 rounded-lg h-full flex flex-col items-center justify-center text-center">
+                                                <h2 class="text-3xl font-bold text-white mb-4">🚀 ${t.adTitle}</h2>
+                                                <p class="text-indigo-100 text-lg mb-6">${t.adDescription}</p>
+                                                <button class="bg-white text-indigo-700 px-8 py-3 rounded-lg font-bold text-lg hover:bg-indigo-50 transition-colors">
+                                                    ${t.learnMore} →
+                                                </button>
+                                            </div>
+                                        `,
+                                        isActive: true
+                                    })}
+                                    className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                                >
+                                    {t.loadAd}
+                                </button>
+                                <button
+                                    onClick={() => setHtmlContent(null)}
+                                    className="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                                >
+                                    {t.clearContent}
+                                </button>
+                            </div>
+
+                            {/* Custom HTML Input */}
+                            <div className="mt-4">
+                                <label className="text-xs text-slate-400 block mb-2">{t.customHtml}</label>
+                                <textarea
+                                    value={customHtml}
+                                    onChange={(e) => setCustomHtml(e.target.value)}
+                                    placeholder={t.htmlPlaceholder}
+                                    className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-sm text-white font-mono h-32 resize-none focus:outline-none focus:border-indigo-500"
+                                />
+                                <button
+                                    onClick={() => {
+                                        if (customHtml.trim()) {
+                                            setHtmlContent({
+                                                id: 'custom-' + Date.now(),
+                                                title: 'Custom HTML',
+                                                html: customHtml,
+                                                isActive: true
+                                            });
+                                        }
+                                    }}
+                                    className="mt-2 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+                                >
+                                    {t.loadCustomHtml}
+                                </button>
+                            </div>
+
+                            {htmlContent && (
+                                <div className="mt-4 p-3 bg-slate-950 rounded-lg border border-slate-700">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-sm text-emerald-400">✓ {t.activeContent}: {htmlContent.title}</span>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Engagement Control */}

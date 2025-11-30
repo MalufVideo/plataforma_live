@@ -4,15 +4,19 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { EngagementPanel } from './components/EngagementPanel';
 import { AdminConsole } from './pages/AdminConsole';
 import { BreakoutRooms } from './pages/BreakoutRooms';
-import { StreamSource, UserRole, Message, Question, Poll, Survey, Language } from './types';
+import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, PlayerSize, HtmlContent } from './types';
 import { CURRENT_USER, MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS } from './constants';
-import { MessageSquare, X } from 'lucide-react';
+import { MessageSquare, X, Monitor } from 'lucide-react';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('stage'); // stage, rooms, agenda, networking, admin
   const [source, setSource] = useState<StreamSource>(StreamSource.CUSTOM_RTMP);
   const [lang, setLang] = useState<Language>('pt');
-  
+
+  // Player size control (admin feature)
+  const [playerSize, setPlayerSize] = useState<PlayerSize>(PlayerSize.FULL);
+  const [htmlContent, setHtmlContent] = useState<HtmlContent | null>(null);
+
   // Mobile specific state
   const [showMobileChat, setShowMobileChat] = useState(false);
   
@@ -90,13 +94,17 @@ const App: React.FC = () => {
       
       <main className="flex-1 flex flex-col relative overflow-hidden mb-16 md:mb-0">
         {activeTab === 'admin' ? (
-           <AdminConsole 
+           <AdminConsole
               session={MOCK_SESSION}
               currentSource={source}
               setSource={setSource}
               updatePoll={setPoll}
               updateSurvey={setSurvey}
               lang={lang}
+              playerSize={playerSize}
+              setPlayerSize={setPlayerSize}
+              htmlContent={htmlContent}
+              setHtmlContent={setHtmlContent}
            />
         ) : activeTab === 'rooms' ? (
            <BreakoutRooms onJoinRoom={handleJoinRoom} lang={lang} />
@@ -107,9 +115,45 @@ const App: React.FC = () => {
             <div className="flex-1 flex flex-col overflow-y-auto bg-black custom-scrollbar">
                {activeTab === 'stage' ? (
                    <>
-                     {/* Sticky Video Container */}
-                     <div className="sticky top-0 z-20 w-full bg-black shadow-lg">
-                        <VideoPlayer source={source} isLive={MOCK_SESSION.status === 'LIVE'} role={CURRENT_USER.role} lang={lang} />
+                     {/* Video and HTML Content Container */}
+                     <div className={`sticky top-0 z-20 w-full bg-black shadow-lg ${
+                       playerSize !== PlayerSize.FULL ? 'flex flex-col lg:flex-row gap-4 p-4' : ''
+                     }`}>
+                        {/* Video Player Container */}
+                        <div className={`bg-black ${
+                          playerSize === PlayerSize.FULL ? 'w-full' :
+                          playerSize === PlayerSize.MEDIUM ? 'w-full lg:w-2/3' :
+                          'w-full lg:w-1/2'
+                        }`}>
+                           <VideoPlayer source={source} isLive={MOCK_SESSION.status === 'LIVE'} role={CURRENT_USER.role} lang={lang} />
+                        </div>
+
+                        {/* HTML Content Display Area */}
+                        {playerSize !== PlayerSize.FULL && htmlContent && (
+                           <div className={`${
+                             playerSize === PlayerSize.MEDIUM ? 'w-full lg:w-1/3' :
+                             'w-full lg:w-1/2'
+                           } min-h-[300px] lg:min-h-[400px]`}>
+                              <div
+                                className="w-full h-full"
+                                dangerouslySetInnerHTML={{ __html: htmlContent.html }}
+                              />
+                           </div>
+                        )}
+
+                        {/* Placeholder when no content is loaded */}
+                        {playerSize !== PlayerSize.FULL && !htmlContent && (
+                           <div className={`${
+                             playerSize === PlayerSize.MEDIUM ? 'w-full lg:w-1/3' :
+                             'w-full lg:w-1/2'
+                           } min-h-[300px] lg:min-h-[400px] flex items-center justify-center bg-slate-900 rounded-lg border-2 border-dashed border-slate-700`}>
+                              <div className="text-center text-slate-500 p-8">
+                                 <Monitor className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                 <p className="font-medium">{t.noHtmlContent}</p>
+                                 <p className="text-sm mt-2">{t.loadContentFromAdmin}</p>
+                              </div>
+                           </div>
+                        )}
                      </div>
                      
                      {/* Session Info */}

@@ -19,6 +19,19 @@ export enum EngagementType {
   ATTENDEES = 'ATTENDEES'
 }
 
+export enum PlayerSize {
+  FULL = 'FULL',
+  MEDIUM = 'MEDIUM',
+  SMALL = 'SMALL'
+}
+
+export interface HtmlContent {
+  id: string;
+  title: string;
+  html: string;
+  isActive: boolean;
+}
+
 export type Language = 'pt' | 'en';
 
 export interface User {
