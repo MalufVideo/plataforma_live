@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StreamSource, UserRole, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Maximize, Volume2, VolumeX, Radio, Settings2, PenTool, Eraser, Activity } from 'lucide-react';
+import { Maximize, Volume2, VolumeX, Radio, Settings2, PenTool, Eraser, Activity, Sparkles } from 'lucide-react';
+import { ThreeDVideoOverlay } from './ThreeDVideoOverlay';
 
 interface VideoPlayerProps {
   source: StreamSource;
@@ -14,9 +15,12 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, isLive, role, 
   const [isMuted, setIsMuted] = useState(true);
   const [showControls, setShowControls] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
+  const [threeDMode, setThreeDMode] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  
+  const [containerSize, setContainerSize] = useState({ width: 1920, height: 1080 });
+
   const t = TRANSLATIONS[lang].stage;
 
   // Drawing Logic
@@ -61,8 +65,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, isLive, role, 
     }
   }, []);
 
+  // Track container size for 3D overlay
+  useEffect(() => {
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight,
+        });
+      }
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, []);
+
   return (
-    <div 
+    <div
+      ref={containerRef}
       className="relative w-full aspect-video bg-black rounded-none lg:rounded-xl overflow-hidden shadow-2xl group border-y lg:border border-slate-800"
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
@@ -101,13 +122,20 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, isLive, role, 
       </div>
 
       {/* Drawing Layer */}
-      <canvas 
+      <canvas
         ref={canvasRef}
         className={`absolute inset-0 w-full h-full z-10 ${drawingMode ? 'cursor-crosshair pointer-events-auto' : 'pointer-events-none'}`}
         onMouseDown={startDrawing}
         onMouseMove={draw}
         onMouseUp={stopDrawing}
         onMouseLeave={stopDrawing}
+      />
+
+      {/* 3D Overlay Layer */}
+      <ThreeDVideoOverlay
+        isActive={threeDMode}
+        containerWidth={containerSize.width}
+        containerHeight={containerSize.height}
       />
 
       {/* Overlays / Watermark */}
@@ -125,7 +153,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, isLive, role, 
       {/* Admin Drawing Tools */}
       {role === UserRole.ADMIN && (
         <div className="absolute top-4 right-4 z-30 flex flex-col gap-2">
-            <button 
+            <button
+                onClick={() => setThreeDMode(!threeDMode)}
+                className={`p-2 rounded-full backdrop-blur-md transition-all shadow-lg ${threeDMode ? 'bg-purple-600 text-white ring-2 ring-white/50' : 'bg-black/60 text-white/70 hover:bg-black/80'}`}
+                title="Toggle 3D Animation Overlay"
+            >
+                <Sparkles className="w-5 h-5" />
+            </button>
+            <button
                 onClick={() => setDrawingMode(!drawingMode)}
                 className={`p-2 rounded-full backdrop-blur-md transition-all shadow-lg ${drawingMode ? 'bg-indigo-600 text-white ring-2 ring-white/50' : 'bg-black/60 text-white/70 hover:bg-black/80'}`}
                 title="Toggle Telestrator (Draw on screen)"
@@ -133,7 +168,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, isLive, role, 
                 <PenTool className="w-5 h-5" />
             </button>
             {drawingMode && (
-                <button 
+                <button
                 onClick={clearCanvas}
                 className="p-2 rounded-full bg-red-600/90 text-white hover:bg-red-600 backdrop-blur-md shadow-lg"
                 title="Clear Drawings"
