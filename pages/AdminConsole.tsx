@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { StreamSource, Poll, Session, Survey, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Settings, RefreshCw, BarChart3, Users, AlertTriangle, ClipboardList, Eye } from 'lucide-react';
-import { suggestPollQuestion, generateSurvey } from '../services/geminiService';
+import { Settings, BarChart3, Users, AlertTriangle, Eye } from 'lucide-react';
 
 interface AdminConsoleProps {
   session: Session;
@@ -23,51 +22,7 @@ const MiniChart = ({ color }: { color: string }) => (
 );
 
 export const AdminConsole: React.FC<AdminConsoleProps> = ({ session, currentSource, setSource, updatePoll, updateSurvey, lang }) => {
-    const [aiLoading, setAiLoading] = useState(false);
-    const [surveyLoading, setSurveyLoading] = useState(false);
-    
     const t = TRANSLATIONS[lang].admin;
-
-    const handleGeneratePoll = async () => {
-        setAiLoading(true);
-        // Simulate grabbing context from transcript
-        const context = "We are discussing the trade-offs between low latency streaming protocols like WebRTC and scalability of HLS CDNs.";
-        const result = await suggestPollQuestion(context, lang);
-        try {
-            const parsed = JSON.parse(result);
-            if (parsed.question && parsed.options) {
-                updatePoll({
-                    id: `p-${Date.now()}`,
-                    question: parsed.question,
-                    options: parsed.options.map((t: string, i: number) => ({ id: `o${i}`, text: t, votes: 0 })),
-                    isActive: true,
-                    totalVotes: 0
-                });
-            }
-        } catch (e) {
-            console.error("Failed to parse AI poll");
-        }
-        setAiLoading(false);
-    };
-
-    const handleGenerateSurvey = async () => {
-        setSurveyLoading(true);
-        const result = await generateSurvey(session.title, lang);
-        try {
-            const parsed = JSON.parse(result);
-            if (parsed.title && parsed.fields) {
-                updateSurvey({
-                    id: `srv-${Date.now()}`,
-                    title: parsed.title,
-                    fields: parsed.fields,
-                    isActive: true
-                });
-            }
-        } catch (e) {
-            console.error("Failed to parse AI survey");
-        }
-        setSurveyLoading(false);
-    };
 
     return (
         <div className="p-4 md:p-6 h-full overflow-y-auto bg-slate-950 text-slate-200 pb-20 md:pb-6">
@@ -169,34 +124,6 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ session, currentSour
                                 </div>
                             </div>
                         </div>
-                    </div>
-
-                    {/* AI Actions */}
-                    <div className="bg-gradient-to-br from-indigo-900/40 to-slate-900 rounded-xl border border-indigo-500/30 p-6">
-                         <div className="flex items-center gap-2 mb-4">
-                            <RefreshCw className={`w-4 h-4 text-indigo-400 ${aiLoading || surveyLoading ? 'animate-spin' : ''}`} />
-                            <h2 className="text-sm font-bold text-indigo-300">{t.aiDirector}</h2>
-                         </div>
-                         
-                         <div className="space-y-3">
-                            <button 
-                                onClick={handleGeneratePoll}
-                                disabled={aiLoading}
-                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm"
-                            >
-                                <BarChart3 className="w-4 h-4" />
-                                {aiLoading ? t.drafting : t.createPoll}
-                            </button>
-                            
-                            <button 
-                                onClick={handleGenerateSurvey}
-                                disabled={surveyLoading}
-                                className="w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2 text-sm border border-slate-700"
-                            >
-                                <ClipboardList className="w-4 h-4" />
-                                {surveyLoading ? t.drafting : t.createSurvey}
-                            </button>
-                         </div>
                     </div>
 
                     {/* Emergency */}
