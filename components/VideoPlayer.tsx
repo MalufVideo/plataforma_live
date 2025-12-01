@@ -70,13 +70,13 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, isLive, role, 
       {/* Video Content Layer */}
       <div className="absolute inset-0 flex items-center justify-center bg-black">
         {source === StreamSource.YOUTUBE ? (
-           <iframe 
-             width="100%" 
-             height="100%" 
-             src="https://www.youtube.com/embed/jfKfPfyJRdk?autoplay=1&mute=1&controls=0&modestbranding=1" 
-             title="Live Stream" 
-             frameBorder="0" 
-             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+           <iframe
+             width="100%"
+             height="100%"
+             src="https://www.youtube.com/embed/VGPlvmMjPtE?autoplay=1&mute=1&controls=0&modestbranding=1"
+             title="Live Stream"
+             frameBorder="0"
+             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
              allowFullScreen
              className="pointer-events-none w-full h-full object-cover"
            ></iframe>

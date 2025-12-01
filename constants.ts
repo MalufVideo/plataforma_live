@@ -163,9 +163,9 @@ export const CURRENT_USER: User = {
 
 export const MOCK_SESSION: Session = {
   id: 's1',
-  title: 'Keynote: O Futuro do Streaming Corporativo',
-  description: 'Junte-se a nós para um mergulho profundo na arquitetura de baixa latência, integração de IA e o futuro dos eventos híbridos. Esta sessão aborda a escalabilidade do WebRTC vs HLS e como proteger seu conteúdo corporativo.',
-  speaker: 'Sarah Connor',
+  title: 'TEST: Live Streaming Video Test',
+  description: 'Testing live streaming functionality with YouTube video source (https://www.youtube.com/watch?v=VGPlvmMjPtE). This session is configured to simulate a live event stream before backend setup is complete.',
+  speaker: 'Test Stream',
   startTime: '10:00',
   endTime: '11:00',
   status: 'LIVE',
@@ -173,7 +173,7 @@ export const MOCK_SESSION: Session = {
 };
 
 export const MOCK_ROOMS: Room[] = [
-  { id: 'r1', name: 'Palco Principal', speaker: 'Sarah Connor', topic: 'Keynote', viewers: 12450, thumbnail: 'https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=800&q=80', isMainStage: true },
+  { id: 'r1', name: 'Palco Principal', speaker: 'Test Stream', topic: 'Live Streaming Video Test', viewers: 12450, thumbnail: 'https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=800&q=80', isMainStage: true },
   { id: 'r2', name: 'Sala A: Segurança', speaker: 'James T.', topic: 'Streaming Zero Trust', viewers: 450, thumbnail: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80' },
   { id: 'r3', name: 'Sala B: Engajamento', speaker: 'Emily R.', topic: 'Estratégias de Gamificação', viewers: 890, thumbnail: 'https://images.unsplash.com/photo-1551818255-e6e10975bc17?w=800&q=80' },
   { id: 'r4', name: 'Workshop: React 19', speaker: 'Dan A.', topic: 'Sessão de Live Coding', viewers: 1200, thumbnail: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800&q=80' },
