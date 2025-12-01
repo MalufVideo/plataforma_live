@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { EngagementType, Message, Question, Poll, Survey, User, UserRole, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { MessageSquare, HelpCircle, BarChart2, Users, Send, ThumbsUp, CheckCircle, Sparkles, ClipboardList } from 'lucide-react';
-import { summarizeChat } from '../services/geminiService';
 
 interface EngagementPanelProps {
   currentUser: User;
@@ -32,10 +31,6 @@ export const EngagementPanel: React.FC<EngagementPanelProps> = ({
   const [activeTab, setActiveTab] = useState<EngagementType>(EngagementType.CHAT);
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
-  // AI State
-  const [aiSummary, setAiSummary] = useState<string | null>(null);
-  const [isSummarizing, setIsSummarizing] = useState(false);
 
   // Survey State
   const [surveySubmitted, setSurveySubmitted] = useState(false);
@@ -58,13 +53,6 @@ export const EngagementPanel: React.FC<EngagementPanelProps> = ({
       onSendMessage(inputText);
       setInputText('');
     }
-  };
-
-  const handleAiSummary = async () => {
-    setIsSummarizing(true);
-    const summary = await summarizeChat(messages, lang);
-    setAiSummary(summary);
-    setIsSummarizing(false);
   };
 
   return (
@@ -103,29 +91,7 @@ export const EngagementPanel: React.FC<EngagementPanelProps> = ({
           <div className="flex flex-col h-full">
             <div className="p-3 bg-indigo-900/20 border-b border-indigo-900/50 flex items-center justify-between">
                 <span className="text-xs font-semibold text-indigo-300">{t.liveChat}</span>
-                {currentUser.role === UserRole.ADMIN && (
-                    <button 
-                        onClick={handleAiSummary}
-                        disabled={isSummarizing}
-                        className="flex items-center gap-1 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-2 py-1 rounded transition-colors"
-                    >
-                        <Sparkles className="w-3 h-3" />
-                        {isSummarizing ? t.analyzing : t.aiSummary}
-                    </button>
-                )}
             </div>
-
-            {aiSummary && (
-                <div className="m-3 p-3 bg-slate-800 rounded-lg border border-indigo-500/30">
-                    <div className="flex justify-between items-start mb-1">
-                        <span className="text-xs font-bold text-indigo-400 flex items-center gap-1">
-                            <Sparkles className="w-3 h-3" /> {t.aiSummary}
-                        </span>
-                        <button onClick={() => setAiSummary(null)} className="text-slate-500 hover:text-white text-xs">✕</button>
-                    </div>
-                    <p className="text-xs text-slate-300 whitespace-pre-wrap">{aiSummary}</p>
-                </div>
-            )}
 
             <div className="flex-1 p-4 space-y-4">
               {messages.map((msg) => (

@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { StreamSource, Poll, Session, Survey, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { Settings, RefreshCw, BarChart3, Users, AlertTriangle, ClipboardList, Eye, ArrowLeft, Activity, MonitorPlay, Mic2, Layers, Wifi, Globe } from 'lucide-react';
-import { suggestPollQuestion, generateSurvey } from '../services/geminiService';
 
 interface AdminConsoleProps {
   session: Session;
@@ -23,50 +22,7 @@ const MiniChart = ({ color }: { color: string }) => (
 );
 
 export const AdminConsole: React.FC<AdminConsoleProps> = ({ session, currentSource, setSource, updatePoll, updateSurvey, lang, onLogout }) => {
-    const [aiLoading, setAiLoading] = useState(false);
-    const [surveyLoading, setSurveyLoading] = useState(false);
-    
     const t = TRANSLATIONS[lang].admin;
-
-    const handleGeneratePoll = async () => {
-        setAiLoading(true);
-        const context = "We are discussing the trade-offs between low latency streaming protocols like WebRTC and scalability of HLS CDNs.";
-        const result = await suggestPollQuestion(context, lang);
-        try {
-            const parsed = JSON.parse(result);
-            if (parsed.question && parsed.options) {
-                updatePoll({
-                    id: `p-${Date.now()}`,
-                    question: parsed.question,
-                    options: parsed.options.map((t: string, i: number) => ({ id: `o${i}`, text: t, votes: 0 })),
-                    isActive: true,
-                    totalVotes: 0
-                });
-            }
-        } catch (e) {
-            console.error("Failed to parse AI poll");
-        }
-        setAiLoading(false);
-    };
-
-    const handleGenerateSurvey = async () => {
-        setSurveyLoading(true);
-        const result = await generateSurvey(session.title, lang);
-        try {
-            const parsed = JSON.parse(result);
-            if (parsed.title && parsed.fields) {
-                updateSurvey({
-                    id: `srv-${Date.now()}`,
-                    title: parsed.title,
-                    fields: parsed.fields,
-                    isActive: true
-                });
-            }
-        } catch (e) {
-            console.error("Failed to parse AI survey");
-        }
-        setSurveyLoading(false);
-    };
 
     return (
         <div className="min-h-screen bg-[#0b0c15] text-slate-200 font-mono flex flex-col">
@@ -186,37 +142,16 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({ session, currentSour
                          </div>
                     </div>
 
-                    {/* AI Director Tools */}
+                    {/* Stream Controls */}
                     <div className="bg-[#14151f] rounded border border-slate-800 p-5 flex-1">
                         <div className="flex items-center gap-2 mb-6 text-indigo-400">
-                            <Mic2 className="w-4 h-4" />
-                            <span className="text-xs font-bold uppercase">{t.aiDirector}</span>
+                            <Settings className="w-4 h-4" />
+                            <span className="text-xs font-bold uppercase">Stream Controls</span>
                         </div>
 
-                        <div className="space-y-4">
-                            <button 
-                                onClick={handleGeneratePoll}
-                                disabled={aiLoading}
-                                className="w-full group bg-indigo-900/10 hover:bg-indigo-900/30 border border-indigo-500/30 hover:border-indigo-400 text-indigo-300 rounded p-4 text-left transition-all"
-                            >
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="font-bold text-sm">{t.createPoll}</span>
-                                    <BarChart3 className={`w-4 h-4 ${aiLoading ? 'animate-spin' : ''}`} />
-                                </div>
-                                <p className="text-[10px] opacity-70">Analyze audio transcript & suggest engagement.</p>
-                            </button>
-
-                            <button 
-                                onClick={handleGenerateSurvey}
-                                disabled={surveyLoading}
-                                className="w-full group bg-slate-800/30 hover:bg-slate-800/50 border border-slate-700 hover:border-slate-500 text-slate-300 rounded p-4 text-left transition-all"
-                            >
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="font-bold text-sm">{t.createSurvey}</span>
-                                    <ClipboardList className={`w-4 h-4 ${surveyLoading ? 'animate-spin' : ''}`} />
-                                </div>
-                                <p className="text-[10px] opacity-70">Generate session feedback form.</p>
-                            </button>
+                        <div className="space-y-4 text-center text-slate-500 py-8">
+                            <Activity className="w-12 h-12 mx-auto opacity-30" />
+                            <p className="text-sm">Advanced controls will be available here</p>
                         </div>
                     </div>
 
