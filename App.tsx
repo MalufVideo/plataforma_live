@@ -4,19 +4,22 @@ import { VideoPlayer } from './components/VideoPlayer';
 import { EngagementPanel } from './components/EngagementPanel';
 import { AdminConsole } from './pages/AdminConsole';
 import { BreakoutRooms } from './pages/BreakoutRooms';
-import { StreamSource, UserRole, Message, Question, Poll, Survey, Language } from './types';
+import { LoginPage } from './pages/LoginPage';
+import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User } from './types';
 import { CURRENT_USER, MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('stage'); // stage, rooms, agenda, networking, admin
+  // Authentication State
+  const [user, setUser] = useState<User | null>(null);
+  
+  // App State
+  const [activeTab, setActiveTab] = useState('stage'); // stage, rooms, agenda, networking
   const [source, setSource] = useState<StreamSource>(StreamSource.CUSTOM_RTMP);
   const [lang, setLang] = useState<Language>('pt');
-  
-  // Mobile specific state
   const [showMobileChat, setShowMobileChat] = useState(false);
   
-  // Simulated Real-time Data State
+  // Data State
   const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
   const [poll, setPoll] = useState<Poll>(INITIAL_POLL);
@@ -25,11 +28,10 @@ const App: React.FC = () => {
 
   // Simulated WebSocket Effect
   useEffect(() => {
+    if (!user) return; // Only run when logged in
+
     const interval = setInterval(() => {
-      // Simulate viewer count fluctuation
       setViewers(prev => prev + Math.floor(Math.random() * 10) - 4);
-      
-      // Simulate incoming chat messages rarely
       if (Math.random() > 0.95) {
         const newMsg: Message = {
             id: `m-${Date.now()}`,
@@ -44,14 +46,25 @@ const App: React.FC = () => {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [user]);
+
+  const handleLogin = (role: UserRole) => {
+    setUser({ ...CURRENT_USER, role });
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setActiveTab('stage');
+    setSource(StreamSource.CUSTOM_RTMP);
+  };
 
   const handleSendMessage = (text: string) => {
+    if (!user) return;
     const newMsg: Message = {
         id: `m-${Date.now()}`,
-        userId: CURRENT_USER.id,
-        userName: CURRENT_USER.name,
-        userRole: CURRENT_USER.role,
+        userId: user.id,
+        userName: user.name,
+        userRole: user.role,
         text,
         timestamp: Date.now()
     };
@@ -75,33 +88,43 @@ const App: React.FC = () => {
   };
   
   const handleJoinRoom = (roomId: string) => {
-      // In a real app, this would switch the session context
       console.log(`Joining Room: ${roomId}`);
       setActiveTab('stage');
-      // Simulate source switch for demo
       setSource(roomId === 'r1' ? StreamSource.CUSTOM_RTMP : StreamSource.HLS);
   };
 
   const t = TRANSLATIONS[lang].stage;
 
+  // 1. Not Logged In -> Login Screen
+  if (!user) {
+    return <LoginPage onLogin={handleLogin} lang={lang} setLang={setLang} />;
+  }
+
+  // 2. Logged in as Admin -> Admin Console Layout
+  if (user.role === UserRole.ADMIN) {
+    return (
+        <AdminConsole 
+            session={MOCK_SESSION}
+            currentSource={source}
+            setSource={setSource}
+            updatePoll={setPoll}
+            updateSurvey={setSurvey}
+            lang={lang}
+            onLogout={handleLogout}
+        />
+    );
+  }
+
+  // 3. Logged in as Attendee -> Standard App Layout
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
-      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} role={CURRENT_USER.role} lang={lang} setLang={setLang} />
+      <Navigation activeTab={activeTab} setActiveTab={setActiveTab} lang={lang} setLang={setLang} onLogout={handleLogout} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden mb-16 md:mb-0">
-        {activeTab === 'admin' ? (
-           <AdminConsole 
-              session={MOCK_SESSION}
-              currentSource={source}
-              setSource={setSource}
-              updatePoll={setPoll}
-              updateSurvey={setSurvey}
-              lang={lang}
-           />
-        ) : activeTab === 'rooms' ? (
+        {activeTab === 'rooms' ? (
            <BreakoutRooms onJoinRoom={handleJoinRoom} lang={lang} />
         ) : (
-          /* Main Stage Layout (used for Stage and specific rooms) */
+          /* Main Stage Layout */
           <div className="flex flex-1 overflow-hidden flex-col lg:flex-row relative">
             {/* Center Stage */}
             <div className="flex-1 flex flex-col overflow-y-auto bg-black custom-scrollbar">
@@ -109,7 +132,7 @@ const App: React.FC = () => {
                    <>
                      {/* Sticky Video Container */}
                      <div className="sticky top-0 z-20 w-full bg-black shadow-lg">
-                        <VideoPlayer source={source} isLive={MOCK_SESSION.status === 'LIVE'} role={CURRENT_USER.role} lang={lang} />
+                        <VideoPlayer source={source} isLive={MOCK_SESSION.status === 'LIVE'} role={user.role} lang={lang} />
                      </div>
                      
                      {/* Session Info */}
@@ -169,14 +192,13 @@ const App: React.FC = () => {
               </button>
             )}
 
-            {/* Right Engagement Panel (Desktop: Fixed, Mobile: Overlay) */}
+            {/* Right Engagement Panel */}
             <div className={`
                 fixed lg:relative inset-0 lg:inset-auto z-30 lg:z-auto bg-slate-900 lg:bg-transparent lg:w-96
                 transition-transform duration-300 transform 
                 ${activeTab === 'stage' ? '' : 'hidden'}
                 ${showMobileChat ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
             `}>
-               {/* Mobile Header for Chat */}
                <div className="lg:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900">
                   <span className="font-bold text-white">Interação</span>
                   <button onClick={() => setShowMobileChat(false)} className="text-slate-400">
@@ -185,7 +207,7 @@ const App: React.FC = () => {
                </div>
                
                <EngagementPanel 
-                  currentUser={CURRENT_USER}
+                  currentUser={user}
                   messages={messages}
                   questions={questions}
                   poll={poll}

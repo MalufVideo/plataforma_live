@@ -2,6 +2,15 @@ import { User, UserRole, Session, StreamSource, Poll, Message, Question, Room, S
 
 export const TRANSLATIONS = {
   pt: {
+    login: {
+      title: 'Selecione seu Perfil de Acesso',
+      attendee: 'Participante',
+      attendeeDesc: 'Entrar no evento ao vivo',
+      producer: 'Produtor / Admin',
+      producerDesc: 'Acessar sala de controle',
+      enter: 'Entrar',
+      welcome: 'Bem-vindo ao'
+    },
     nav: {
       stage: 'Palco Principal',
       rooms: 'Salas',
@@ -28,6 +37,8 @@ export const TRANSLATIONS = {
       polls: 'Enquetes',
       survey: 'Pesquisa',
       liveChat: 'Chat ao Vivo',
+      aiSummary: 'Resumo IA',
+      analyzing: 'Analisando...',
       typeMessage: 'Digite sua mensagem...',
       topQuestions: 'Principais Perguntas',
       askQuestion: 'Fazer Pergunta',
@@ -41,17 +52,22 @@ export const TRANSLATIONS = {
       connection: 'Conexão Excelente'
     },
     admin: {
-      title: 'Sala de Controle do Produtor',
+      title: 'MCR - Master Control Room',
       onAir: 'NO AR',
-      streamHealth: 'Saúde do Stream & Fonte',
-      activeViewers: 'Espectadores Ativos',
+      streamHealth: 'Sinal & Fonte',
+      activeViewers: 'Audiência Real-Time',
       registered: 'Inscritos',
-      dangerZone: 'Zona de Perigo',
-      restart: 'Reiniciar Stream',
-      endEvent: 'Encerrar Evento',
-      bitrate: 'Taxa de Bits',
+      aiDirector: 'Diretor IA',
+      createPoll: 'Lançar Enquete',
+      createSurvey: 'Lançar Pesquisa',
+      drafting: 'Gerando...',
+      dangerZone: 'Zona Crítica',
+      restart: 'Reiniciar Sinal',
+      endEvent: 'Encerrar Transmissão',
+      bitrate: 'Bitrate',
       fps: 'FPS',
-      dropped: 'Quadros Perdidos'
+      dropped: 'Perda de Quadros',
+      back: 'Voltar ao Login'
     },
     rooms: {
       title: 'Sessões ao Vivo & Breakouts',
@@ -60,6 +76,15 @@ export const TRANSLATIONS = {
     }
   },
   en: {
+    login: {
+      title: 'Select Access Profile',
+      attendee: 'Attendee',
+      attendeeDesc: 'Enter live event experience',
+      producer: 'Producer / Admin',
+      producerDesc: 'Access master control room',
+      enter: 'Enter',
+      welcome: 'Welcome to'
+    },
     nav: {
       stage: 'Main Stage',
       rooms: 'Breakout Rooms',
@@ -86,6 +111,8 @@ export const TRANSLATIONS = {
       polls: 'Polls',
       survey: 'Survey',
       liveChat: 'Live Chat',
+      aiSummary: 'AI Summary',
+      analyzing: 'Analyzing...',
       typeMessage: 'Type a message...',
       topQuestions: 'Top Questions',
       askQuestion: 'Ask Question',
@@ -99,17 +126,22 @@ export const TRANSLATIONS = {
       connection: 'Excellent Connection'
     },
     admin: {
-      title: 'Producer Control Room',
+      title: 'MCR - Master Control Room',
       onAir: 'ON AIR',
-      streamHealth: 'Stream Health & Source',
-      activeViewers: 'Active Viewers',
+      streamHealth: 'Signal & Source',
+      activeViewers: 'Real-Time Audience',
       registered: 'Registered',
-      dangerZone: 'Danger Zone',
-      restart: 'Restart Stream',
-      endEvent: 'End Event',
+      aiDirector: 'AI Director',
+      createPoll: 'Launch Poll',
+      createSurvey: 'Launch Survey',
+      drafting: 'Drafting...',
+      dangerZone: 'Critical Zone',
+      restart: 'Restart Signal',
+      endEvent: 'Cut Transmission',
       bitrate: 'Bitrate',
       fps: 'FPS',
-      dropped: 'Dropped Frames'
+      dropped: 'Dropped Frames',
+      back: 'Back to Login'
     },
     rooms: {
       title: 'Live Sessions & Breakouts',
@@ -122,7 +154,7 @@ export const TRANSLATIONS = {
 export const CURRENT_USER: User = {
   id: 'u1',
   name: 'Alex Rivera',
-  role: UserRole.ADMIN, // Set to ADMIN to show producer controls
+  role: UserRole.ATTENDEE, 
   avatar: 'https://picsum.photos/200',
   company: 'TechCorp Global',
   title: 'CTO',
