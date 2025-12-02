@@ -1,0 +1,91 @@
+# Coolify-specific Docker Compose configuration
+# This file is optimized for Coolify deployment
+
+version: '3.8'
+
+services:
+  streaming:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "1935:1935"
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://livevideo:${DB_PASSWORD}@postgres:5432/livevideo?schema=public
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+      - RTMP_HOST=${RTMP_HOST:-${COOLIFY_FQDN}}
+      - HLS_HOST=${HLS_HOST:-${COOLIFY_FQDN}:8080}
+      - CORS_ORIGIN=${CORS_ORIGIN:-*}
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY}
+    volumes:
+      - hls_data:/tmp/hls
+      - recordings:/tmp/recordings
+      - thumbnails:/tmp/thumbnails
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    labels:
+      - "coolify.managed=true"
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=livevideo
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=livevideo
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U livevideo -d livevideo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: >
+      sh -c "
+        cd /app &&
+        npx prisma migrate deploy &&
+        node prisma/seed.js
+      "
+    environment:
+      - DATABASE_URL=postgresql://livevideo:${DB_PASSWORD}@postgres:5432/livevideo?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+volumes:
+  postgres_data:
+  redis_data:
+  hls_data:
+  recordings:
+  thumbnails:

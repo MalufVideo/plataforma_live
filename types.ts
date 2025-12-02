@@ -55,6 +55,7 @@ export interface PollOption {
   id: string;
   text: string;
   votes: number;
+  isCorrect?: boolean;
 }
 
 export interface Poll {
@@ -98,4 +99,27 @@ export interface Session {
   endTime: string;
   status: 'LIVE' | 'UPCOMING' | 'ENDED';
   viewers: number;
+}
+
+export interface UserActivity {
+  userId: string;
+  userName: string;
+  email: string;
+  role: UserRole;
+  loginTime: number;
+  logoutTime?: number;
+  sessionDuration: number; // in minutes
+  ipAddress: string;
+  location: string;
+  device: string;
+  browser: string;
+  connectionType: string;
+  questionsAsked: number;
+  pollsAnswered: number;
+  engagementScore: number; // 0-100
+  history: {
+    timestamp: number;
+    action: string;
+    details?: string;
+  }[];
 }

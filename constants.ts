@@ -1,4 +1,4 @@
-import { User, UserRole, Session, StreamSource, Poll, Message, Question, Room, Survey, Language } from './types';
+import { User, UserRole, Session, StreamSource, Poll, Message, Question, Room, Survey, Language, UserActivity } from './types';
 
 export const TRANSLATIONS = {
   pt: {
@@ -68,6 +68,31 @@ export const TRANSLATIONS = {
       fps: 'FPS',
       dropped: 'Perda de Quadros',
       back: 'Voltar ao Login'
+    },
+    reports: {
+      title: 'Relatórios de Usuários',
+      export: 'Exportar CSV',
+      searchPlaceholder: 'Buscar por nome, email ou ID...',
+      columns: {
+        user: 'Usuário',
+        role: 'Perfil',
+        session: 'Sessão',
+        engagement: 'Engajamento',
+        location: 'Localização',
+        actions: 'Ações'
+      },
+      details: {
+        techInfo: 'Informações Técnicas',
+        activityLog: 'Histórico de Atividades',
+        questions: 'Perguntas Realizadas',
+        browser: 'Navegador',
+        device: 'Dispositivo',
+        ip: 'Endereço IP',
+        connection: 'Conexão',
+        login: 'Entrada',
+        logout: 'Saída',
+        duration: 'Duração'
+      }
     },
     rooms: {
       title: 'Sessões ao Vivo & Breakouts',
@@ -143,6 +168,31 @@ export const TRANSLATIONS = {
       dropped: 'Dropped Frames',
       back: 'Back to Login'
     },
+    reports: {
+      title: 'User Reports',
+      export: 'Export CSV',
+      searchPlaceholder: 'Search by name, email or ID...',
+      columns: {
+        user: 'User',
+        role: 'Role',
+        session: 'Session',
+        engagement: 'Engagement',
+        location: 'Location',
+        actions: 'Actions'
+      },
+      details: {
+        techInfo: 'Technical Info',
+        activityLog: 'Activity Log',
+        questions: 'Questions Asked',
+        browser: 'Browser',
+        device: 'Device',
+        ip: 'IP Address',
+        connection: 'Connection',
+        login: 'Login',
+        logout: 'Logout',
+        duration: 'Duration'
+      }
+    },
     rooms: {
       title: 'Live Sessions & Breakouts',
       subtitle: 'Choose a track to join live interactive sessions.',
@@ -154,7 +204,7 @@ export const TRANSLATIONS = {
 export const CURRENT_USER: User = {
   id: 'u1',
   name: 'Alex Rivera',
-  role: UserRole.ATTENDEE, 
+  role: UserRole.ATTENDEE,
   avatar: 'https://picsum.photos/200',
   company: 'TechCorp Global',
   title: 'CTO',
@@ -211,3 +261,93 @@ export const INITIAL_POLL: Poll = {
     { id: 'opt3', text: 'Ferramentas de Engajamento', votes: 400 },
   ]
 };
+
+export const MOCK_USER_ACTIVITIES: UserActivity[] = [
+  {
+    userId: 'u1',
+    userName: 'Alex Rivera',
+    email: 'alex.rivera@techcorp.com',
+    role: UserRole.ATTENDEE,
+    loginTime: Date.now() - 3600000,
+    sessionDuration: 60,
+    ipAddress: '192.168.1.1',
+    location: 'São Paulo, BR',
+    device: 'MacBook Pro',
+    browser: 'Chrome 120.0',
+    connectionType: 'Fiber 500Mbps',
+    questionsAsked: 2,
+    pollsAnswered: 1,
+    engagementScore: 85,
+    history: [
+      { timestamp: Date.now() - 3600000, action: 'LOGIN', details: 'Via Email' },
+      { timestamp: Date.now() - 3000000, action: 'JOIN_ROOM', details: 'Main Stage' },
+      { timestamp: Date.now() - 2500000, action: 'VOTE_POLL', details: 'Poll #1' },
+      { timestamp: Date.now() - 1000000, action: 'ASK_QUESTION', details: 'About API limits' }
+    ]
+  },
+  {
+    userId: 'u2',
+    userName: 'João Silva',
+    email: 'joao.silva@email.com',
+    role: UserRole.ATTENDEE,
+    loginTime: Date.now() - 1800000,
+    sessionDuration: 30,
+    ipAddress: '200.100.50.25',
+    location: 'Rio de Janeiro, BR',
+    device: 'iPhone 15',
+    browser: 'Safari Mobile',
+    connectionType: '5G',
+    questionsAsked: 0,
+    pollsAnswered: 1,
+    engagementScore: 60,
+    history: [
+      { timestamp: Date.now() - 1800000, action: 'LOGIN', details: 'Via Social' },
+      { timestamp: Date.now() - 1700000, action: 'JOIN_ROOM', details: 'Main Stage' },
+      { timestamp: Date.now() - 500000, action: 'CHAT_MESSAGE', details: 'Hello everyone!' }
+    ]
+  },
+  {
+    userId: 'u3',
+    userName: 'Maria Santos',
+    email: 'maria.s@enterprise.com',
+    role: UserRole.ATTENDEE,
+    loginTime: Date.now() - 7200000,
+    logoutTime: Date.now() - 100000,
+    sessionDuration: 118,
+    ipAddress: '177.20.10.5',
+    location: 'Curitiba, BR',
+    device: 'Windows 11 PC',
+    browser: 'Edge',
+    connectionType: 'Cable',
+    questionsAsked: 5,
+    pollsAnswered: 3,
+    engagementScore: 95,
+    history: [
+      { timestamp: Date.now() - 7200000, action: 'LOGIN' },
+      { timestamp: Date.now() - 7000000, action: 'JOIN_ROOM', details: 'Workshop React' },
+      { timestamp: Date.now() - 3600000, action: 'SWITCH_ROOM', details: 'Main Stage' },
+      { timestamp: Date.now() - 100000, action: 'LOGOUT' }
+    ]
+  },
+  {
+    userId: 'u5',
+    userName: 'Miguel Chen',
+    email: 'mchen@startup.io',
+    role: UserRole.ATTENDEE,
+    loginTime: Date.now() - 900000,
+    sessionDuration: 15,
+    ipAddress: '189.30.20.1',
+    location: 'Belo Horizonte, BR',
+    device: 'Linux Desktop',
+    browser: 'Firefox',
+    connectionType: 'Fiber',
+    questionsAsked: 1,
+    pollsAnswered: 0,
+    engagementScore: 40,
+    history: [
+      { timestamp: Date.now() - 900000, action: 'LOGIN' },
+      { timestamp: Date.now() - 850000, action: 'JOIN_ROOM', details: 'Main Stage' },
+      { timestamp: Date.now() - 120000, action: 'ASK_QUESTION', details: 'On-premise support?' }
+    ]
+  }
+];
