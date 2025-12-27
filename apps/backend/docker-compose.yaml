@@ -4,8 +4,8 @@ services:
     build: .
     ports:
       - "3000" # Expose internally for Coolify Proxy
-      - "1936:1936" # RTMP shifted to 1936
-      - "8001:8001" # HLS shifted to 8001
+      - "1936:1936" # RTMP
+      - "8001" # FLV - internal only, accessed via Traefik
     labels:
       - "coolify.managed=true"
       - "traefik.enable=true"
