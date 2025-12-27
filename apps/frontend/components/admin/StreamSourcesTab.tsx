@@ -96,7 +96,7 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
         hasVideo: true,
         cors: true
       }, {
-        enableWorker: true,
+        enableWorker: false,  // Disabled - causes errors in production builds
         enableStashBuffer: false,
         stashInitialSize: 128,
         lazyLoad: false,

@@ -48,7 +48,7 @@ export const LiveStreamPreview: React.FC<LiveStreamPreviewProps> = ({
         hasVideo: true,
         cors: true
       }, {
-        enableWorker: true,
+        enableWorker: false,  // Disabled - causes errors in production builds
         enableStashBuffer: false,
         stashInitialSize: 128,
         lazyLoad: false,
