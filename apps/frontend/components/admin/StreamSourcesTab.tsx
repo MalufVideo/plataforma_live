@@ -5,6 +5,7 @@ import {
   Zap, Settings, Link2, Unlink
 } from 'lucide-react';
 import { StreamSource, Project } from '../../types';
+import { LiveStreamPreview } from './LiveStreamPreview';
 
 interface StreamSourcesTabProps {
   currentSource: StreamSource;
@@ -337,6 +338,17 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
                     </p>
                   </div>
                 </div>
+
+                {/* Live Stream Preview */}
+                {currentProject && (
+                  <div className="pt-3 border-t border-slate-800">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Live Preview</h4>
+                    <LiveStreamPreview
+                      streamKey={currentProject.rtmpStreamKey}
+                      isStreaming={currentProject.status === 'LIVE'}
+                    />
+                  </div>
+                )}
 
                 {/* Encoder Settings */}
                 <div className="pt-3 border-t border-slate-800">
