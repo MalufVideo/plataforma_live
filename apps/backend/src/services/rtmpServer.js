@@ -7,21 +7,30 @@ dotenv.config();
 let nms = null;
 let ioInstance = null;
 
+// Check if ffmpeg exists before enabling transcoding
+const ffmpegPath = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
+const enableTranscoding = process.env.ENABLE_TRANSCODING === 'true';
+
 const config = {
     rtmp: {
-        port: parseInt(process.env.RTMP_PORT) || 1935,
+        port: parseInt(process.env.RTMP_PORT) || 1936,
         chunk_size: 60000,
         gop_cache: true,
         ping: 30,
         ping_timeout: 60
     },
     http: {
-        port: parseInt(process.env.RTMP_HTTP_PORT) || 8000,
+        port: parseInt(process.env.RTMP_HTTP_PORT) || 8001,
         allow_origin: '*',
         mediaroot: process.env.HLS_OUTPUT_DIR || './media'
-    },
-    trans: {
-        ffmpeg: process.env.FFMPEG_PATH || '/usr/bin/ffmpeg',
+    }
+};
+
+// Only add trans config if transcoding is explicitly enabled
+// This avoids the "version is not defined" error in node-media-server
+if (enableTranscoding) {
+    config.trans = {
+        ffmpeg: ffmpegPath,
         tasks: [
             {
                 app: 'live',
@@ -30,8 +39,11 @@ const config = {
                 hlsKeep: false
             }
         ]
-    }
-};
+    };
+    console.log('[RTMP] Transcoding enabled with ffmpeg:', ffmpegPath);
+} else {
+    console.log('[RTMP] Transcoding disabled - set ENABLE_TRANSCODING=true to enable');
+}
 
 /**
  * Validate stream key against database
