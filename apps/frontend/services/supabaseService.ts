@@ -752,6 +752,7 @@ export const getProjects = async (): Promise<Project[]> => {
     description: p.description,
     status: p.status,
     isOnDemand: p.is_on_demand,
+    isPublic: p.is_public ?? true,
     createdAt: new Date(p.created_at).getTime(),
     startedAt: p.started_at ? new Date(p.started_at).getTime() : undefined,
     endedAt: p.ended_at ? new Date(p.ended_at).getTime() : undefined,
@@ -781,6 +782,7 @@ export const getProject = async (projectId: string): Promise<Project | null> => 
     description: data.description,
     status: data.status,
     isOnDemand: data.is_on_demand,
+    isPublic: data.is_public ?? true,
     createdAt: new Date(data.created_at).getTime(),
     startedAt: data.started_at ? new Date(data.started_at).getTime() : undefined,
     endedAt: data.ended_at ? new Date(data.ended_at).getTime() : undefined,
@@ -807,6 +809,7 @@ export const createProject = async (
       description: projectData.description,
       status: projectData.status,
       is_on_demand: projectData.isOnDemand,
+      is_public: projectData.isPublic ?? true,
       youtube_video_id: projectData.youtubeVideoId,
       thumbnail: projectData.thumbnail,
       rtmp_stream_key: streamKey,
@@ -824,6 +827,7 @@ export const createProject = async (
     description: data.description,
     status: data.status,
     isOnDemand: data.is_on_demand,
+    isPublic: data.is_public ?? true,
     createdAt: new Date(data.created_at).getTime(),
     startedAt: data.started_at ? new Date(data.started_at).getTime() : undefined,
     endedAt: data.ended_at ? new Date(data.ended_at).getTime() : undefined,
@@ -845,6 +849,7 @@ export const updateProject = async (
   if (updates.description !== undefined) dbUpdates.description = updates.description;
   if (updates.status !== undefined) dbUpdates.status = updates.status;
   if (updates.isOnDemand !== undefined) dbUpdates.is_on_demand = updates.isOnDemand;
+  if (updates.isPublic !== undefined) dbUpdates.is_public = updates.isPublic;
   if (updates.youtubeVideoId !== undefined) dbUpdates.youtube_video_id = updates.youtubeVideoId;
   if (updates.thumbnail !== undefined) dbUpdates.thumbnail = updates.thumbnail;
   if (updates.viewers !== undefined) dbUpdates.viewers = updates.viewers;
@@ -866,6 +871,7 @@ export const updateProject = async (
     description: data.description,
     status: data.status,
     isOnDemand: data.is_on_demand,
+    isPublic: data.is_public ?? true,
     createdAt: new Date(data.created_at).getTime(),
     startedAt: data.started_at ? new Date(data.started_at).getTime() : undefined,
     endedAt: data.ended_at ? new Date(data.ended_at).getTime() : undefined,
@@ -892,4 +898,26 @@ export const toggleProjectOnDemand = async (projectId: string): Promise<Project>
   if (!project) throw new Error('Project not found');
 
   return updateProject(projectId, { isOnDemand: !project.isOnDemand });
+};
+
+export const toggleProjectPublic = async (projectId: string): Promise<Project> => {
+  // First get current state
+  const project = await getProject(projectId);
+  if (!project) throw new Error('Project not found');
+
+  return updateProject(projectId, { isPublic: !project.isPublic });
+};
+
+export const endStream = async (projectId: string): Promise<Project> => {
+  return updateProject(projectId, {
+    status: 'ENDED',
+    endedAt: Date.now()
+  });
+};
+
+export const goLive = async (projectId: string): Promise<Project> => {
+  return updateProject(projectId, {
+    status: 'LIVE',
+    startedAt: Date.now()
+  });
 };

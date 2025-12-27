@@ -30,6 +30,7 @@ interface AdminConsoleProps {
   onSelectProject: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
   onToggleOnDemand: (projectId: string) => void;
+  onUpdateProject: (project: Project) => void;
 }
 
 type AdminTab = 'projects' | 'dashboard' | 'sources' | 'analytics' | 'reports' | 'transcoding' | 'engagement' | 'settings';
@@ -61,7 +62,8 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   onCreateProject,
   onSelectProject,
   onDeleteProject,
-  onToggleOnDemand
+  onToggleOnDemand,
+  onUpdateProject
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('projects');
   const [isPremium, setIsPremium] = useState(true); // Toggle for demo
@@ -201,6 +203,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             setYoutubeVideoId={setYoutubeVideoId}
             isPremium={isPremium}
             currentProject={projects.find(p => p.id === currentProjectId) || null}
+            onProjectUpdate={onUpdateProject}
           />
         )}
 

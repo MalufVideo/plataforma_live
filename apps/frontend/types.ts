@@ -133,6 +133,7 @@ export interface Project {
   description: string;
   status: ProjectStatus;
   isOnDemand: boolean; // If true, ended project is available for on-demand viewing
+  isPublic: boolean; // If true, stream is publicly viewable
   createdAt: number;
   startedAt?: number;
   endedAt?: number;

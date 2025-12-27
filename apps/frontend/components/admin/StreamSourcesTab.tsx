@@ -3,10 +3,12 @@ import {
   Radio, Server, Copy, Check, Eye, EyeOff,
   Play, Square, RefreshCw, AlertTriangle, CheckCircle,
   Zap, Share2, ExternalLink, Users, Clock, Activity,
-  Settings, ChevronDown, Wifi, WifiOff, Volume2, VolumeX, Maximize2
+  Settings, ChevronDown, Wifi, WifiOff, Volume2, VolumeX, Maximize2,
+  Globe, Lock, Power
 } from 'lucide-react';
 import flvjs from 'flv.js';
 import { StreamSource, Project } from '../../types';
+import { toggleProjectPublic, endStream, goLive } from '../../services/supabaseService';
 
 interface StreamSourcesTabProps {
   currentSource: StreamSource;
@@ -14,6 +16,7 @@ interface StreamSourcesTabProps {
   setYoutubeVideoId: (id: string) => void;
   isPremium: boolean;
   currentProject?: Project | null;
+  onProjectUpdate?: (project: Project) => void;
 }
 
 // Server URLs
@@ -24,7 +27,8 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
   setSource,
   setYoutubeVideoId,
   isPremium,
-  currentProject
+  currentProject,
+  onProjectUpdate
 }) => {
   // Video player refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -44,6 +48,7 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   // RTMP credentials
   const rtmpServerUrl = 'rtmp://ingest.livevideo.com.br:1936/live';
@@ -212,6 +217,47 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
       }
     } else {
       handleCopyShareUrl();
+    }
+  };
+
+  const handleTogglePublic = async () => {
+    if (!currentProject || isUpdating) return;
+    setIsUpdating(true);
+    try {
+      const updated = await toggleProjectPublic(currentProject.id);
+      onProjectUpdate?.(updated);
+    } catch (err) {
+      console.error('Failed to toggle public:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleEndStream = async () => {
+    if (!currentProject || isUpdating) return;
+    if (!confirm('Are you sure you want to end this stream?')) return;
+    setIsUpdating(true);
+    try {
+      const updated = await endStream(currentProject.id);
+      onProjectUpdate?.(updated);
+      stopPlayer();
+    } catch (err) {
+      console.error('Failed to end stream:', err);
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleGoLive = async () => {
+    if (!currentProject || isUpdating) return;
+    setIsUpdating(true);
+    try {
+      const updated = await goLive(currentProject.id);
+      onProjectUpdate?.(updated);
+    } catch (err) {
+      console.error('Failed to go live:', err);
+    } finally {
+      setIsUpdating(false);
     }
   };
 
@@ -451,6 +497,61 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
                 </a>
               </div>
             </div>
+          </div>
+
+          {/* Stream Control Buttons */}
+          <div className="bg-slate-900/50 border border-slate-800 rounded-xl p-4 space-y-3">
+            <h3 className="text-xs font-bold text-slate-400 uppercase mb-3">Stream Controls</h3>
+
+            {/* Go Live / End Stream Button */}
+            {currentProject.status === 'LIVE' ? (
+              <button
+                onClick={handleEndStream}
+                disabled={isUpdating}
+                className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 text-white py-3 rounded-lg font-bold transition-colors"
+              >
+                <Power className="w-5 h-5" />
+                {isUpdating ? 'Ending...' : 'End Stream'}
+              </button>
+            ) : (
+              <button
+                onClick={handleGoLive}
+                disabled={isUpdating}
+                className="w-full flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 text-white py-3 rounded-lg font-bold transition-colors"
+              >
+                <Radio className="w-5 h-5" />
+                {isUpdating ? 'Starting...' : 'Go Live'}
+              </button>
+            )}
+
+            {/* Public / Private Toggle */}
+            <button
+              onClick={handleTogglePublic}
+              disabled={isUpdating}
+              className={`w-full flex items-center justify-center gap-2 py-3 rounded-lg font-medium transition-colors ${
+                currentProject.isPublic
+                  ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  : 'bg-amber-600 hover:bg-amber-500 text-white'
+              } disabled:opacity-50`}
+            >
+              {currentProject.isPublic ? (
+                <>
+                  <Globe className="w-5 h-5" />
+                  Public Stream
+                </>
+              ) : (
+                <>
+                  <Lock className="w-5 h-5" />
+                  Private Stream
+                </>
+              )}
+            </button>
+
+            <p className="text-xs text-slate-500 text-center">
+              {currentProject.isPublic
+                ? 'Anyone with the link can watch'
+                : 'Only you can see this stream'}
+            </p>
           </div>
 
           {/* Stream Settings */}

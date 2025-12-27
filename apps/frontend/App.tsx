@@ -216,6 +216,12 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateProject = (updatedProject: Project) => {
+    setProjects(prev => prev.map(p =>
+      p.id === updatedProject.id ? updatedProject : p
+    ));
+  };
+
   const t = TRANSLATIONS[lang].stage;
 
   // Show loading state while checking auth
@@ -263,6 +269,7 @@ const App: React.FC = () => {
         onSelectProject={handleSelectProject}
         onDeleteProject={handleDeleteProject}
         onToggleOnDemand={handleToggleOnDemand}
+        onUpdateProject={handleUpdateProject}
       />
     );
   }
