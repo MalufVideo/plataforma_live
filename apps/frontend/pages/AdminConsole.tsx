@@ -200,6 +200,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             setSource={setSource}
             setYoutubeVideoId={setYoutubeVideoId}
             isPremium={isPremium}
+            currentProject={projects.find(p => p.id === currentProjectId) || null}
           />
         )}
 

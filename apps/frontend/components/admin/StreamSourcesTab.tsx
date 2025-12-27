@@ -4,20 +4,22 @@ import {
   Play, Square, RefreshCw, AlertTriangle, CheckCircle, Lock,
   Zap, Settings, Link2, Unlink
 } from 'lucide-react';
-import { StreamSource } from '../../types';
+import { StreamSource, Project } from '../../types';
 
 interface StreamSourcesTabProps {
   currentSource: StreamSource;
   setSource: (s: StreamSource) => void;
   setYoutubeVideoId: (id: string) => void;
   isPremium: boolean;
+  currentProject?: Project | null;
 }
 
 export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
   currentSource,
   setSource,
   setYoutubeVideoId,
-  isPremium
+  isPremium,
+  currentProject
 }) => {
   // YouTube Source State
   const [youtubeUrl, setYoutubeUrl] = useState('');
@@ -33,10 +35,10 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedUrl, setCopiedUrl] = useState(false);
 
-  // Mock RTMP credentials
-  const rtmpServerUrl = 'rtmp://ingest.onav.live/live';
-  const rtmpStreamKey = 'stream_key_a8f3k2j5m9n1p4q7r0s6t8u2v5w3x1y9z4';
-  const rtmpBackupUrl = 'rtmp://backup.onav.live/live';
+  // RTMP credentials - use current project's stream key
+  const rtmpServerUrl = 'rtmp://ingest.livevideo.com.br:1936/live';
+  const rtmpStreamKey = currentProject?.rtmpStreamKey || 'No project selected - create a project first';
+  const rtmpBackupUrl = 'rtmp://backup.livevideo.com.br:1936/live';
 
   const extractYoutubeId = (url: string): string | null => {
     const patterns = [
@@ -236,6 +238,32 @@ export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
 
             {isPremium ? (
               <div className="p-4 space-y-4">
+                {/* Current Project Indicator */}
+                {currentProject ? (
+                  <div className="bg-indigo-900/30 border border-indigo-500/30 rounded-lg p-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-[10px] text-indigo-400 uppercase font-bold">Streaming to Project</span>
+                        <p className="text-sm text-white font-medium">{currentProject.name}</p>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded-full font-bold ${
+                        currentProject.status === 'LIVE' ? 'bg-red-500 text-white' :
+                        currentProject.status === 'DRAFT' ? 'bg-amber-500 text-white' :
+                        'bg-slate-500 text-white'
+                      }`}>
+                        {currentProject.status}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-amber-900/30 border border-amber-500/30 rounded-lg p-3">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      <span className="text-sm">No project selected. Go to Projects tab to create or select a project first.</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Server Status */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="bg-slate-900/50 rounded-lg p-3">
