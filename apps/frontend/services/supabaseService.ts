@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
-import { User as AppUser, UserRole, Message, Question, Poll, PollOption, Room, Session as EventSession } from '../types';
+import { User as AppUser, UserRole, Message, Question, Poll, PollOption, Room, Session as EventSession, Project } from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'http://supabasekong-mo0gsg800wo4csgw4w04gggs.72.60.142.28.sslip.io';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabasekong-mo0gsg800wo4csgw4w04gggs.72.60.142.28.sslip.io';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NDYzNzMyMCwiZXhwIjo0OTIwMzEwOTIwLCJyb2xlIjoiYW5vbiJ9.CqUFsTjOYVzcSNZBWCrVBsMTlWDJz5RTU_s24lm604w';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
@@ -706,4 +706,190 @@ export const getPlatformMetrics = async () => {
     totalQuestions: questionCount || 0,
     totalPolls: pollCount || 0,
   };
+};
+
+// =============================================
+// PROJECTS FUNCTIONS
+// =============================================
+
+// Generate a unique RTMP stream key
+const generateStreamKey = (): string => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let key = '';
+  for (let i = 0; i < 32; i++) {
+    key += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return key;
+};
+
+export const getProjects = async (): Promise<Project[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Get user role
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+
+  let query = supabase
+    .from('projects')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  // If not MASTER_ADMIN, only show user's own projects
+  if (profile?.role !== 'MASTER_ADMIN') {
+    query = query.eq('owner_id', user.id);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    status: p.status,
+    isOnDemand: p.is_on_demand,
+    createdAt: new Date(p.created_at).getTime(),
+    startedAt: p.started_at ? new Date(p.started_at).getTime() : undefined,
+    endedAt: p.ended_at ? new Date(p.ended_at).getTime() : undefined,
+    youtubeVideoId: p.youtube_video_id,
+    thumbnail: p.thumbnail,
+    viewers: p.viewers,
+    rtmpStreamKey: p.rtmp_stream_key,
+    ownerId: p.owner_id
+  }));
+};
+
+export const getProject = async (projectId: string): Promise<Project | null> => {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    status: data.status,
+    isOnDemand: data.is_on_demand,
+    createdAt: new Date(data.created_at).getTime(),
+    startedAt: data.started_at ? new Date(data.started_at).getTime() : undefined,
+    endedAt: data.ended_at ? new Date(data.ended_at).getTime() : undefined,
+    youtubeVideoId: data.youtube_video_id,
+    thumbnail: data.thumbnail,
+    viewers: data.viewers,
+    rtmpStreamKey: data.rtmp_stream_key,
+    ownerId: data.owner_id
+  };
+};
+
+export const createProject = async (
+  projectData: Omit<Project, 'id' | 'createdAt' | 'viewers' | 'rtmpStreamKey' | 'ownerId'>
+): Promise<Project> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const streamKey = generateStreamKey();
+
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({
+      name: projectData.name,
+      description: projectData.description,
+      status: projectData.status,
+      is_on_demand: projectData.isOnDemand,
+      youtube_video_id: projectData.youtubeVideoId,
+      thumbnail: projectData.thumbnail,
+      rtmp_stream_key: streamKey,
+      owner_id: user.id,
+      viewers: 0
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    status: data.status,
+    isOnDemand: data.is_on_demand,
+    createdAt: new Date(data.created_at).getTime(),
+    startedAt: data.started_at ? new Date(data.started_at).getTime() : undefined,
+    endedAt: data.ended_at ? new Date(data.ended_at).getTime() : undefined,
+    youtubeVideoId: data.youtube_video_id,
+    thumbnail: data.thumbnail,
+    viewers: data.viewers,
+    rtmpStreamKey: data.rtmp_stream_key,
+    ownerId: data.owner_id
+  };
+};
+
+export const updateProject = async (
+  projectId: string,
+  updates: Partial<Omit<Project, 'id' | 'createdAt' | 'rtmpStreamKey' | 'ownerId'>>
+): Promise<Project> => {
+  const dbUpdates: any = {};
+
+  if (updates.name !== undefined) dbUpdates.name = updates.name;
+  if (updates.description !== undefined) dbUpdates.description = updates.description;
+  if (updates.status !== undefined) dbUpdates.status = updates.status;
+  if (updates.isOnDemand !== undefined) dbUpdates.is_on_demand = updates.isOnDemand;
+  if (updates.youtubeVideoId !== undefined) dbUpdates.youtube_video_id = updates.youtubeVideoId;
+  if (updates.thumbnail !== undefined) dbUpdates.thumbnail = updates.thumbnail;
+  if (updates.viewers !== undefined) dbUpdates.viewers = updates.viewers;
+  if (updates.startedAt !== undefined) dbUpdates.started_at = new Date(updates.startedAt).toISOString();
+  if (updates.endedAt !== undefined) dbUpdates.ended_at = new Date(updates.endedAt).toISOString();
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update(dbUpdates)
+    .eq('id', projectId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    name: data.name,
+    description: data.description,
+    status: data.status,
+    isOnDemand: data.is_on_demand,
+    createdAt: new Date(data.created_at).getTime(),
+    startedAt: data.started_at ? new Date(data.started_at).getTime() : undefined,
+    endedAt: data.ended_at ? new Date(data.ended_at).getTime() : undefined,
+    youtubeVideoId: data.youtube_video_id,
+    thumbnail: data.thumbnail,
+    viewers: data.viewers,
+    rtmpStreamKey: data.rtmp_stream_key,
+    ownerId: data.owner_id
+  };
+};
+
+export const deleteProject = async (projectId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', projectId);
+
+  if (error) throw error;
+};
+
+export const toggleProjectOnDemand = async (projectId: string): Promise<Project> => {
+  // First get current state
+  const project = await getProject(projectId);
+  if (!project) throw new Error('Project not found');
+
+  return updateProject(projectId, { isOnDemand: !project.isOnDemand });
 };

@@ -9,7 +9,7 @@ import { LoginPage } from './pages/LoginPage';
 import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
 import { MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
-import { getCurrentUser, onAuthStateChange, signOut } from './services/supabaseService';
+import { getCurrentUser, onAuthStateChange, signOut, getProjects, createProject, deleteProject, toggleProjectOnDemand } from './services/supabaseService';
 
 const App: React.FC = () => {
   // Authentication State
@@ -31,8 +31,35 @@ const App: React.FC = () => {
   const [viewers, setViewers] = useState(MOCK_SESSION.viewers);
 
   // Projects State
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(MOCK_PROJECTS[0]?.id || null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [projectsLoading, setProjectsLoading] = useState(true);
+
+  // Load projects when user is authenticated
+  useEffect(() => {
+    const loadProjects = async () => {
+      if (!user) {
+        setProjects([]);
+        setCurrentProjectId(null);
+        setProjectsLoading(false);
+        return;
+      }
+
+      try {
+        const fetchedProjects = await getProjects();
+        setProjects(fetchedProjects);
+        if (fetchedProjects.length > 0 && !currentProjectId) {
+          setCurrentProjectId(fetchedProjects[0].id);
+        }
+      } catch (error) {
+        console.error('Failed to load projects:', error);
+      } finally {
+        setProjectsLoading(false);
+      }
+    };
+
+    loadProjects();
+  }, [user]);
 
   // Check auth state on mount and listen for changes
   useEffect(() => {
@@ -63,7 +90,37 @@ const App: React.FC = () => {
       }
     });
 
-    return () => subscription?.unsubscribe();
+    // Refresh user profile every 30 seconds to pick up role changes
+    const refreshInterval = setInterval(async () => {
+      try {
+        const appUser = await getCurrentUser();
+        if (appUser) {
+          setUser(appUser);
+        }
+      } catch (error) {
+        console.error('User refresh failed:', error);
+      }
+    }, 30000); // 30 seconds
+
+    // Also refresh on window focus
+    const handleFocus = async () => {
+      try {
+        const appUser = await getCurrentUser();
+        if (appUser) {
+          setUser(appUser);
+        }
+      } catch (error) {
+        console.error('User refresh on focus failed:', error);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      subscription?.unsubscribe();
+      clearInterval(refreshInterval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleLogout = async () => {
@@ -112,15 +169,15 @@ const App: React.FC = () => {
   };
 
   // Project Management Handlers
-  const handleCreateProject = (projectData: Omit<Project, 'id' | 'createdAt' | 'viewers'>) => {
-    const newProject: Project = {
-      ...projectData,
-      id: `proj-${Date.now()}`,
-      createdAt: Date.now(),
-      viewers: 0
-    };
-    setProjects(prev => [newProject, ...prev]);
-    setCurrentProjectId(newProject.id);
+  const handleCreateProject = async (projectData: Omit<Project, 'id' | 'createdAt' | 'viewers' | 'rtmpStreamKey' | 'ownerId'>) => {
+    try {
+      const newProject = await createProject(projectData);
+      setProjects(prev => [newProject, ...prev]);
+      setCurrentProjectId(newProject.id);
+    } catch (error) {
+      console.error('Failed to create project:', error);
+      alert('Failed to create project. Please try again.');
+    }
   };
 
   const handleSelectProject = (projectId: string) => {
@@ -133,17 +190,30 @@ const App: React.FC = () => {
     }
   };
 
-  const handleDeleteProject = (projectId: string) => {
-    setProjects(prev => prev.filter(p => p.id !== projectId));
-    if (currentProjectId === projectId) {
-      setCurrentProjectId(projects.find(p => p.id !== projectId)?.id || null);
+  const handleDeleteProject = async (projectId: string) => {
+    try {
+      await deleteProject(projectId);
+      setProjects(prev => prev.filter(p => p.id !== projectId));
+      if (currentProjectId === projectId) {
+        const remaining = projects.filter(p => p.id !== projectId);
+        setCurrentProjectId(remaining[0]?.id || null);
+      }
+    } catch (error) {
+      console.error('Failed to delete project:', error);
+      alert('Failed to delete project. Please try again.');
     }
   };
 
-  const handleToggleOnDemand = (projectId: string) => {
-    setProjects(prev => prev.map(p =>
-      p.id === projectId ? { ...p, isOnDemand: !p.isOnDemand } : p
-    ));
+  const handleToggleOnDemand = async (projectId: string) => {
+    try {
+      const updatedProject = await toggleProjectOnDemand(projectId);
+      setProjects(prev => prev.map(p =>
+        p.id === projectId ? updatedProject : p
+      ));
+    } catch (error) {
+      console.error('Failed to toggle on-demand:', error);
+      alert('Failed to update project. Please try again.');
+    }
   };
 
   const t = TRANSLATIONS[lang].stage;
