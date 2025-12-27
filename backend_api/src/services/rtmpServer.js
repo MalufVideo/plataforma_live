@@ -1,0 +1,202 @@
+import NodeMediaServer from 'node-media-server';
+import { supabase } from '../config/database.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+let nms = null;
+let ioInstance = null;
+
+const config = {
+    rtmp: {
+        port: parseInt(process.env.RTMP_PORT) || 1935,
+        chunk_size: 60000,
+        gop_cache: true,
+        ping: 30,
+        ping_timeout: 60
+    },
+    http: {
+        port: parseInt(process.env.RTMP_HTTP_PORT) || 8000,
+        allow_origin: '*',
+        mediaroot: process.env.HLS_OUTPUT_DIR || './media'
+    },
+    trans: {
+        ffmpeg: process.env.FFMPEG_PATH || '/usr/bin/ffmpeg',
+        tasks: [
+            {
+                app: 'live',
+                hls: true,
+                hlsFlags: '[hls_time=2:hls_list_size=3:hls_flags=delete_segments]',
+                hlsKeep: false
+            }
+        ]
+    }
+};
+
+/**
+ * Validate stream key against database
+ */
+async function validateStreamKey(streamKey) {
+    try {
+        const { data, error } = await supabase
+            .from('rtmp_ingest_configs')
+            .select('id, project_id, is_active')
+            .eq('stream_key', streamKey)
+            .eq('is_active', true)
+            .single();
+
+        if (error || !data) {
+            console.log(`[RTMP] Invalid stream key: ${streamKey}`);
+            return null;
+        }
+
+        return data;
+    } catch (err) {
+        console.error('[RTMP] Stream key validation error:', err);
+        return null;
+    }
+}
+
+/**
+ * Update stream status in database
+ */
+async function updateStreamStatus(streamKey, status) {
+    try {
+        const updateData = {
+            updated_at: new Date().toISOString()
+        };
+
+        if (status === 'LIVE') {
+            updateData.last_connected_at = new Date().toISOString();
+        }
+
+        await supabase
+            .from('rtmp_ingest_configs')
+            .update(updateData)
+            .eq('stream_key', streamKey);
+
+        console.log(`[RTMP] Stream ${streamKey} status updated to ${status}`);
+    } catch (err) {
+        console.error('[RTMP] Error updating stream status:', err);
+    }
+}
+
+/**
+ * Notify connected clients via WebSocket
+ */
+function notifyStreamStatus(projectId, status, streamKey) {
+    if (ioInstance) {
+        ioInstance.emit('stream_status', {
+            projectId,
+            status,
+            streamKey,
+            timestamp: Date.now()
+        });
+        console.log(`[RTMP] Notified clients: project ${projectId} is ${status}`);
+    }
+}
+
+/**
+ * Start the RTMP Media Server
+ */
+export function startRtmpServer(io = null) {
+    ioInstance = io;
+
+    nms = new NodeMediaServer(config);
+
+    // Pre-publish authentication
+    nms.on('prePublish', async (id, StreamPath, args) => {
+        console.log(`[RTMP] Pre-publish: id=${id}, StreamPath=${StreamPath}`);
+
+        // Extract stream key from path (format: /live/STREAM_KEY)
+        const pathParts = StreamPath.split('/');
+        const streamKey = pathParts[pathParts.length - 1];
+
+        if (!streamKey) {
+            console.log(`[RTMP] Rejecting stream - no stream key provided`);
+            const session = nms.getSession(id);
+            if (session) session.reject();
+            return;
+        }
+
+        // Validate stream key
+        const ingestConfig = await validateStreamKey(streamKey);
+        if (!ingestConfig) {
+            console.log(`[RTMP] Rejecting stream - invalid stream key: ${streamKey}`);
+            const session = nms.getSession(id);
+            if (session) session.reject();
+            return;
+        }
+
+        console.log(`[RTMP] Stream authorized for project: ${ingestConfig.project_id}`);
+    });
+
+    // Post-publish (stream started)
+    nms.on('postPublish', async (id, StreamPath, args) => {
+        console.log(`[RTMP] Stream started: id=${id}, StreamPath=${StreamPath}`);
+
+        const pathParts = StreamPath.split('/');
+        const streamKey = pathParts[pathParts.length - 1];
+
+        const ingestConfig = await validateStreamKey(streamKey);
+        if (ingestConfig) {
+            await updateStreamStatus(streamKey, 'LIVE');
+            notifyStreamStatus(ingestConfig.project_id, 'LIVE', streamKey);
+        }
+    });
+
+    // Done publish (stream ended)
+    nms.on('donePublish', async (id, StreamPath, args) => {
+        console.log(`[RTMP] Stream ended: id=${id}, StreamPath=${StreamPath}`);
+
+        const pathParts = StreamPath.split('/');
+        const streamKey = pathParts[pathParts.length - 1];
+
+        const ingestConfig = await validateStreamKey(streamKey);
+        if (ingestConfig) {
+            await updateStreamStatus(streamKey, 'OFFLINE');
+            notifyStreamStatus(ingestConfig.project_id, 'OFFLINE', streamKey);
+        }
+    });
+
+    // Pre-play authentication (optional - for playback protection)
+    nms.on('prePlay', (id, StreamPath, args) => {
+        console.log(`[RTMP] Pre-play: id=${id}, StreamPath=${StreamPath}`);
+        // Allow all playback for now, can add auth later
+    });
+
+    nms.run();
+
+    console.log(`[RTMP] Server started on rtmp://localhost:${config.rtmp.port}/live`);
+    console.log(`[RTMP] HTTP-FLV available on http://localhost:${config.http.port}`);
+
+    return nms;
+}
+
+/**
+ * Stop the RTMP server
+ */
+export function stopRtmpServer() {
+    if (nms) {
+        nms.stop();
+        nms = null;
+        console.log('[RTMP] Server stopped');
+    }
+}
+
+/**
+ * Get RTMP server info
+ */
+export function getRtmpServerInfo() {
+    return {
+        rtmpUrl: `rtmp://localhost:${config.rtmp.port}/live`,
+        httpFlvUrl: `http://localhost:${config.http.port}`,
+        isRunning: nms !== null
+    };
+}
+
+export default {
+    startRtmpServer,
+    stopRtmpServer,
+    getRtmpServerInfo
+};

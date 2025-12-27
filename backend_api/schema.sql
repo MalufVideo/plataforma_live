@@ -165,6 +165,56 @@ CREATE TABLE event_users (
 );
 
 
+-- RTMP Ingest Configuration (for vMix/OBS streams)
+CREATE TABLE rtmp_ingest_configs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE,
+  stream_key TEXT UNIQUE NOT NULL,
+  rtmp_url TEXT NOT NULL,
+  name TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  last_connected_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Transcoding Profiles (720p, 1080p, 480p, etc.)
+CREATE TABLE transcoding_profiles (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  name TEXT NOT NULL,              -- e.g., '1080p', '720p', '480p'
+  width INTEGER NOT NULL,          -- e.g., 1920, 1280, 854
+  height INTEGER NOT NULL,         -- e.g., 1080, 720, 480
+  video_bitrate TEXT NOT NULL,     -- e.g., '4500k', '2500k', '1000k'
+  audio_bitrate TEXT DEFAULT '128k',
+  framerate INTEGER DEFAULT 30,
+  preset TEXT DEFAULT 'veryfast',  -- FFmpeg preset
+  is_default BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Transcoding Jobs
+CREATE TABLE transcoding_jobs (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  stream_id UUID REFERENCES streams(id) ON DELETE CASCADE,
+  profile_id UUID REFERENCES transcoding_profiles(id) ON DELETE SET NULL,
+  status TEXT DEFAULT 'PENDING',   -- PENDING, PROCESSING, COMPLETED, FAILED
+  input_url TEXT NOT NULL,
+  output_url TEXT,
+  hls_playlist_url TEXT,
+  progress INTEGER DEFAULT 0,      -- 0-100 percentage
+  error_message TEXT,
+  started_at TIMESTAMP WITH TIME ZONE,
+  completed_at TIMESTAMP WITH TIME ZONE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Default transcoding profiles
+INSERT INTO transcoding_profiles (name, width, height, video_bitrate, audio_bitrate, framerate, preset, is_default) VALUES
+  ('1080p', 1920, 1080, '4500k', '192k', 30, 'veryfast', true),
+  ('720p', 1280, 720, '2500k', '128k', 30, 'veryfast', true),
+  ('480p', 854, 480, '1000k', '96k', 30, 'veryfast', true),
+  ('360p', 640, 360, '600k', '64k', 30, 'veryfast', false);
+
 -- =============================================
 -- FUNCTIONS & TRIGGERS
 -- =============================================
@@ -254,3 +304,25 @@ CREATE INDEX idx_messages_session ON messages(session_id, created_at);
 CREATE INDEX idx_questions_session ON questions(session_id, upvotes DESC);
 CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_profiles_role ON profiles(role);
+CREATE INDEX idx_rtmp_stream_key ON rtmp_ingest_configs(stream_key);
+CREATE INDEX idx_transcoding_jobs_stream ON transcoding_jobs(stream_id, status);
+CREATE INDEX idx_transcoding_jobs_status ON transcoding_jobs(status);
+
+-- =============================================
+-- RLS POLICIES FOR NEW TABLES
+-- =============================================
+
+-- RTMP Ingest Configs: Admin only
+ALTER TABLE rtmp_ingest_configs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "RTMP configs viewable by admins" ON rtmp_ingest_configs FOR SELECT USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+CREATE POLICY "Admins can manage RTMP configs" ON rtmp_ingest_configs FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+
+-- Transcoding Profiles: Public read, Admin write
+ALTER TABLE transcoding_profiles ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Transcoding profiles viewable by everyone" ON transcoding_profiles FOR SELECT USING (true);
+CREATE POLICY "Admins can manage transcoding profiles" ON transcoding_profiles FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+
+-- Transcoding Jobs: Admin only
+ALTER TABLE transcoding_jobs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Transcoding jobs viewable by admins" ON transcoding_jobs FOR SELECT USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+CREATE POLICY "Admins can manage transcoding jobs" ON transcoding_jobs FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );

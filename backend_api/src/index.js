@@ -18,9 +18,14 @@ import questionRoutes from './routes/questions.js';
 import pollRoutes from './routes/polls.js';
 import roomRoutes from './routes/rooms.js';
 import surveyRoutes from './routes/surveys.js';
+import rtmpRoutes from './routes/rtmp.js';
+import transcodingRoutes from './routes/transcoding.js';
 
 // Import WebSocket handlers
 import { setupSocketHandlers } from './websocket/handlers.js';
+
+// Import RTMP Server
+import { startRtmpServer } from './services/rtmpServer.js';
 
 dotenv.config();
 
@@ -62,9 +67,14 @@ app.use('/api/questions', questionRoutes);
 app.use('/api/polls', pollRoutes);
 app.use('/api/rooms', roomRoutes);
 app.use('/api/surveys', surveyRoutes);
+app.use('/api/rtmp', rtmpRoutes);
+app.use('/api/transcoding', transcodingRoutes);
 
 // WebSocket Setup
 setupSocketHandlers(io);
+
+// Start RTMP Server (passing io for WebSocket notifications)
+startRtmpServer(io);
 
 // Start Server
 const PORT = process.env.PORT || 3000;

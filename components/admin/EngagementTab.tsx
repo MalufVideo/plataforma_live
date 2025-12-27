@@ -5,7 +5,7 @@ import {
   ThumbsUp, Send, Edit3, Eye, EyeOff, HelpCircle, User, AlertTriangle
 } from 'lucide-react';
 import { Poll, Survey, Language, Message, Question } from '../../types';
-import { suggestPollQuestion, generateSurvey } from '../../services/geminiService';
+// import { suggestPollQuestion, generateSurvey } from '../../services/geminiService'; // Disabled - Gemini not needed
 
 interface EngagementTabProps {
   poll: Poll;
@@ -34,44 +34,20 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
 
   const handleGeneratePoll = async () => {
     setAiLoading(true);
-    const context = "We are discussing enterprise live streaming technology, including low latency protocols, CDN optimization, and viewer engagement strategies.";
-    const result = await suggestPollQuestion(context, lang);
-    try {
-      const parsed = JSON.parse(result);
-      if (parsed.question && parsed.options) {
-        const newPoll: Poll = {
-          id: `p-${Date.now()}`,
-          question: parsed.question,
-          options: parsed.options.map((t: string, i: number) => ({ id: `o${i}`, text: t, votes: 0 })),
-          isActive: true,
-          totalVotes: 0
-        };
-        updatePoll(newPoll);
-        setNewPollQuestion(parsed.question);
-        setNewPollOptions(parsed.options);
-      }
-    } catch (e) {
-      console.error("Failed to parse AI poll");
-    }
+    // const context = "We are discussing enterprise live streaming technology, including low latency protocols, CDN optimization, and viewer engagement strategies.";
+    // const result = await suggestPollQuestion(context, lang); // Disabled - Gemini not needed
+
+    // Placeholder poll instead of AI-generated
+    alert(lang === 'pt' ? 'Funcionalidade de IA desativada. Por favor, crie a enquete manualmente.' : 'AI functionality disabled. Please create the poll manually.');
     setAiLoading(false);
   };
 
   const handleGenerateSurvey = async () => {
     setSurveyLoading(true);
-    const result = await generateSurvey("Enterprise Live Streaming Platform Demo", lang);
-    try {
-      const parsed = JSON.parse(result);
-      if (parsed.title && parsed.fields) {
-        updateSurvey({
-          id: `srv-${Date.now()}`,
-          title: parsed.title,
-          fields: parsed.fields,
-          isActive: true
-        });
-      }
-    } catch (e) {
-      console.error("Failed to parse AI survey");
-    }
+    // const result = await generateSurvey("Enterprise Live Streaming Platform Demo", lang); // Disabled - Gemini not needed
+
+    // Placeholder survey instead of AI-generated
+    alert(lang === 'pt' ? 'Funcionalidade de IA desativada. Por favor, crie a pesquisa manualmente.' : 'AI functionality disabled. Please create the survey manually.');
     setSurveyLoading(false);
   };
 

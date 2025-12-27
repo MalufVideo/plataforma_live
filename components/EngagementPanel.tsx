@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { EngagementType, Message, Question, Poll, Survey, User, UserRole, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 import { MessageSquare, HelpCircle, BarChart2, Users, Send, ThumbsUp, CheckCircle, Sparkles, ClipboardList } from 'lucide-react';
-import { summarizeChat } from '../services/geminiService';
+// import { summarizeChat } from '../services/geminiService'; // Disabled - Gemini not needed
 
 interface EngagementPanelProps {
   currentUser: User;
@@ -62,7 +62,8 @@ export const EngagementPanel: React.FC<EngagementPanelProps> = ({
 
   const handleAiSummary = async () => {
     setIsSummarizing(true);
-    const summary = await summarizeChat(messages, lang);
+    // const summary = await summarizeChat(messages, lang); // Disabled - Gemini not needed
+    const summary = lang === 'pt' ? "Funcionalidade de IA desativada" : "AI functionality disabled";
     setAiSummary(summary);
     setIsSummarizing(false);
   };

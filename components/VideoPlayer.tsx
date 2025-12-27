@@ -13,9 +13,12 @@ interface VideoPlayerProps {
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId, isLive, role, lang }) => {
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(0.66); // Volume from 0 to 1
   const [showControls, setShowControls] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
 
   const t = TRANSLATIONS[lang].stage;
@@ -52,12 +55,42 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
     ctx?.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
   };
 
+  const handleVolumeChange = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const newVolume = Math.max(0, Math.min(1, clickX / rect.width));
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.volume = newVolume;
+    }
+    if (newVolume === 0) {
+      setIsMuted(true);
+    } else if (isMuted) {
+      setIsMuted(false);
+    }
+  };
+
+  const toggleMute = () => {
+    const newMuted = !isMuted;
+    setIsMuted(newMuted);
+    if (videoRef.current) {
+      videoRef.current.muted = newMuted;
+    }
+  };
+
   useEffect(() => {
     if (canvasRef.current) {
       canvasRef.current.width = canvasRef.current.offsetWidth;
       canvasRef.current.height = canvasRef.current.offsetHeight;
     }
   }, []);
+
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = isMuted;
+    }
+  }, [volume, isMuted]);
 
   return (
     <div
@@ -68,6 +101,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
       <div className="absolute inset-0 flex items-center justify-center bg-black">
         {source === StreamSource.YOUTUBE && youtubeVideoId ? (
           <iframe
+            ref={iframeRef}
             width="100%"
             height="100%"
             src={`https://www.youtube.com/embed/${youtubeVideoId}?autoplay=1&mute=0&controls=1&modestbranding=1`}
@@ -79,14 +113,25 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
           ></iframe>
         ) : (
           <div className="relative w-full h-full flex flex-col items-center justify-center bg-slate-950 overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-slate-900/80 z-0"></div>
-            <img src="https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=1600&q=80" className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay" alt="" />
+            {/* Demo video for testing volume controls */}
+            <video
+              ref={videoRef}
+              className="absolute inset-0 w-full h-full object-cover"
+              autoPlay
+              loop
+              muted={isMuted}
+              playsInline
+            >
+              <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" />
+            </video>
 
-            <div className="z-10 flex flex-col items-center animate-pulse">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/20 to-slate-900/40 z-0"></div>
+
+            <div className="z-10 flex flex-col items-center">
               <div className="w-12 h-12 md:w-20 md:h-20 rounded-full bg-slate-900/50 backdrop-blur-md border border-slate-700 flex items-center justify-center mb-4 shadow-xl">
-                <Activity className="w-6 h-6 md:w-10 md:h-10 text-emerald-500" />
+                <Activity className="w-6 h-6 md:w-10 md:h-10 text-emerald-500 animate-pulse" />
               </div>
-              <h3 className="text-lg md:text-2xl font-bold text-white tracking-tight mb-2">Enterprise Secure Stream</h3>
+              <h3 className="text-lg md:text-2xl font-bold text-white tracking-tight mb-2 drop-shadow-lg">Enterprise Secure Stream</h3>
               <div className="flex items-center gap-3 text-xs md:text-sm font-mono text-emerald-400 bg-black/40 px-3 py-1 rounded-full border border-emerald-500/30">
                 <span className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span>
                 {t.live} | 1080p | 60fps
@@ -141,15 +186,21 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4 md:gap-6">
             <button
-              onClick={() => setIsMuted(!isMuted)}
+              onClick={toggleMute}
               className="text-white hover:text-indigo-400 transition-colors"
             >
-              {isMuted ? <VolumeX className="w-5 h-5 md:w-6 md:h-6" /> : <Volume2 className="w-5 h-5 md:w-6 md:h-6" />}
+              {isMuted || volume === 0 ? <VolumeX className="w-5 h-5 md:w-6 md:h-6" /> : <Volume2 className="w-5 h-5 md:w-6 md:h-6" />}
             </button>
 
             <div className="hidden md:flex flex-col gap-1">
-              <div className="h-1.5 w-32 bg-slate-600 rounded-full cursor-pointer group/vol overflow-hidden">
-                <div className="h-full w-2/3 bg-indigo-500 rounded-full group-hover/vol:bg-indigo-400 relative">
+              <div
+                className="h-1.5 w-32 bg-slate-600 rounded-full cursor-pointer group/vol overflow-hidden"
+                onClick={handleVolumeChange}
+              >
+                <div
+                  className="h-full bg-indigo-500 rounded-full group-hover/vol:bg-indigo-400 relative transition-all"
+                  style={{ width: `${volume * 100}%` }}
+                >
                   <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full opacity-0 group-hover/vol:opacity-100"></div>
                 </div>
               </div>
