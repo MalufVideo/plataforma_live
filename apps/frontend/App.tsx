@@ -8,10 +8,12 @@ import { LoginPage } from './pages/LoginPage';
 import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
 import { CURRENT_USER, MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
+import { getCurrentUser, onAuthStateChange, supabase } from './services/supabaseService';
 
 const App: React.FC = () => {
   // Authentication State
   const [user, setUser] = useState<User | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
   // App State
   const [activeTab, setActiveTab] = useState('stage');
@@ -31,30 +33,65 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(MOCK_PROJECTS[0]?.id || null);
 
-  // Simulated WebSocket Effect
+  // Handle OAuth callback and auth state changes
   useEffect(() => {
-    if (!user) return;
+    const checkAuth = async () => {
+      try {
+        const appUser = await getCurrentUser();
 
-    const interval = setInterval(() => {
-      setViewers(prev => prev + Math.floor(Math.random() * 10) - 4);
-      if (Math.random() > 0.95) {
-        const newMsg: Message = {
-          id: `m-${Date.now()}`,
-          userId: 'u-random',
-          userName: ['Sarah L.', 'Mike T.', 'Guest 402', 'Events Pro'][Math.floor(Math.random() * 4)],
-          userRole: UserRole.ATTENDEE,
-          text: ['Great point!', 'Is the slide deck available?', 'Audio is clear now.', 'Wow!'][Math.floor(Math.random() * 4)],
-          timestamp: Date.now()
-        };
-        setMessages(prev => [...prev, newMsg]);
+        if (appUser) {
+          // Check for intended role from OAuth flow
+          const intendedRole = localStorage.getItem('intended_role') as UserRole | null;
+
+          if (intendedRole) {
+            // Apply the intended role and clear it
+            appUser.role = intendedRole;
+            localStorage.removeItem('intended_role');
+
+            // Optionally update profile role in database
+            await supabase
+              .from('profiles')
+              .update({ role: intendedRole })
+              .eq('id', appUser.id);
+          }
+
+          setUser(appUser);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        setAuthLoading(false);
       }
-    }, 2000);
+    };
 
-    return () => clearInterval(interval);
-  }, [user]);
+    checkAuth();
 
+    // Listen for auth state changes
+    const { data: { subscription } } = onAuthStateChange(async (authUser) => {
+      if (authUser) {
+        const appUser = await getCurrentUser();
+        if (appUser) {
+          const intendedRole = localStorage.getItem('intended_role') as UserRole | null;
+          if (intendedRole) {
+            appUser.role = intendedRole;
+            localStorage.removeItem('intended_role');
+          }
+          setUser(appUser);
+        }
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => subscription?.unsubscribe();
+  }, []);
+
+  // handleLogin is now only used as a fallback/prop requirement
+  // The actual login flow uses Google OAuth
   const handleLogin = (role: UserRole) => {
-    setUser({ ...CURRENT_USER, role });
+    // This is called by LoginPage but won't actually be used
+    // since LoginPage now triggers Google OAuth
+    localStorage.setItem('intended_role', role);
   };
 
   const handleLogout = () => {
@@ -133,6 +170,15 @@ const App: React.FC = () => {
   };
 
   const t = TRANSLATIONS[lang].stage;
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
 
   if (!user) {
     return <LoginPage onLogin={handleLogin} lang={lang} setLang={setLang} />;

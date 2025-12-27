@@ -18,7 +18,7 @@ export const signUp = async (email: string, password: string, name: string, comp
       data: { name, company, title }
     }
   });
-  
+
   if (error) throw error;
   return data;
 };
@@ -28,9 +28,9 @@ export const signIn = async (email: string, password: string) => {
     email,
     password
   });
-  
+
   if (error) throw error;
-  
+
   // Update profile status
   if (data.user) {
     await supabase
@@ -38,37 +38,37 @@ export const signIn = async (email: string, password: string) => {
       .update({ status: 'ONLINE', last_login_at: new Date().toISOString() })
       .eq('id', data.user.id);
   }
-  
+
   return data;
 };
 
 export const signOut = async () => {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (user) {
     await supabase
       .from('profiles')
       .update({ status: 'OFFLINE' })
       .eq('id', user.id);
   }
-  
+
   const { error } = await supabase.auth.signOut();
   if (error) throw error;
 };
 
 export const getCurrentUser = async (): Promise<AppUser | null> => {
   const { data: { user } } = await supabase.auth.getUser();
-  
+
   if (!user) return null;
-  
+
   const { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single();
-  
+
   if (!profile) return null;
-  
+
   return {
     id: profile.id,
     name: profile.name,
@@ -91,6 +91,24 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
   });
 };
 
+export const signInWithGoogle = async (redirectPath?: string) => {
+  const redirectTo = `${window.location.origin}${redirectPath || '/'}`;
+
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo,
+      queryParams: {
+        access_type: 'offline',
+        prompt: 'consent',
+      }
+    }
+  });
+
+  if (error) throw error;
+  return data;
+};
+
 // =============================================
 // PROFILE FUNCTIONS
 // =============================================
@@ -101,7 +119,7 @@ export const getProfile = async (userId: string) => {
     .select('*')
     .eq('id', userId)
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -118,7 +136,7 @@ export const updateProfile = async (userId: string, updates: Partial<{
     .eq('id', userId)
     .select()
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -132,15 +150,15 @@ export const getEvents = async (options?: { status?: string; upcoming?: boolean 
     .from('events')
     .select('*')
     .order('start_time', { ascending: true });
-  
+
   if (options?.status) {
     query = query.eq('status', options.status);
   }
-  
+
   if (options?.upcoming) {
     query = query.gte('start_time', new Date().toISOString());
   }
-  
+
   const { data, error } = await query;
   if (error) throw error;
   return data;
@@ -156,7 +174,7 @@ export const getEvent = async (idOrSlug: string) => {
     `)
     .or(`id.eq.${idOrSlug},slug.eq.${idOrSlug}`)
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -171,7 +189,7 @@ export const getLiveEvent = async () => {
     `)
     .eq('status', 'LIVE')
     .single();
-  
+
   if (error && error.code !== 'PGRST116') throw error;
   return data;
 };
@@ -186,9 +204,9 @@ export const getEventSessions = async (eventId: string): Promise<EventSession[]>
     .select('*')
     .eq('event_id', eventId)
     .order('start_time', { ascending: true });
-  
+
   if (error) throw error;
-  
+
   return data.map(s => ({
     id: s.id,
     title: s.title,
@@ -196,8 +214,8 @@ export const getEventSessions = async (eventId: string): Promise<EventSession[]>
     speaker: s.speaker,
     startTime: s.start_time,
     endTime: s.end_time,
-    status: new Date(s.start_time) <= new Date() && new Date(s.end_time) >= new Date() ? 'LIVE' : 
-            new Date(s.start_time) > new Date() ? 'UPCOMING' : 'ENDED',
+    status: new Date(s.start_time) <= new Date() && new Date(s.end_time) >= new Date() ? 'LIVE' :
+      new Date(s.start_time) > new Date() ? 'UPCOMING' : 'ENDED',
     viewers: 0
   }));
 };
@@ -212,7 +230,7 @@ export const getStream = async (streamId: string) => {
     .select('*')
     .eq('id', streamId)
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -224,7 +242,7 @@ export const getActiveStream = async (eventId: string) => {
     .eq('event_id', eventId)
     .eq('status', 'LIVE')
     .single();
-  
+
   if (error && error.code !== 'PGRST116') throw error;
   return data;
 };
@@ -244,9 +262,9 @@ export const getMessages = async (sessionId: string, limit = 50): Promise<Messag
     .eq('is_deleted', false)
     .order('created_at', { ascending: true })
     .limit(limit);
-  
+
   if (error) throw error;
-  
+
   return data.map(m => ({
     id: m.id,
     userId: m.user_id,
@@ -261,7 +279,7 @@ export const getMessages = async (sessionId: string, limit = 50): Promise<Messag
 export const sendMessage = async (sessionId: string, text: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  
+
   const { data, error } = await supabase
     .from('messages')
     .insert({
@@ -274,7 +292,7 @@ export const sendMessage = async (sessionId: string, text: string) => {
       profiles:user_id (id, name, role, avatar)
     `)
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -297,7 +315,7 @@ export const subscribeToMessages = (sessionId: string, callback: (message: any) 
         `)
         .eq('id', payload.new.id)
         .single();
-      
+
       if (data) {
         callback({
           id: data.id,
@@ -327,9 +345,9 @@ export const getQuestions = async (sessionId: string): Promise<Question[]> => {
     .eq('session_id', sessionId)
     .eq('is_hidden', false)
     .order('upvotes', { ascending: false });
-  
+
   if (error) throw error;
-  
+
   return data.map(q => ({
     id: q.id,
     userId: q.user_id,
@@ -344,7 +362,7 @@ export const getQuestions = async (sessionId: string): Promise<Question[]> => {
 export const submitQuestion = async (sessionId: string, text: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  
+
   const { data, error } = await supabase
     .from('questions')
     .insert({
@@ -354,7 +372,7 @@ export const submitQuestion = async (sessionId: string, text: string) => {
     })
     .select()
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -363,7 +381,7 @@ export const upvoteQuestion = async (questionId: string) => {
   const { data, error } = await supabase.rpc('increment_upvotes', {
     question_id: questionId
   });
-  
+
   if (error) throw error;
   return data;
 };
@@ -396,21 +414,21 @@ export const getPolls = async (sessionId: string): Promise<Poll[]> => {
     `)
     .eq('session_id', sessionId)
     .order('created_at', { ascending: false });
-  
+
   if (error) throw error;
-  
+
   // Get vote counts for each option
   const pollsWithVotes = await Promise.all(data.map(async (poll) => {
     const { data: votes } = await supabase
       .from('poll_votes')
       .select('option_id')
       .eq('poll_id', poll.id);
-    
+
     const voteCounts: Record<string, number> = {};
     (votes || []).forEach(v => {
       voteCounts[v.option_id] = (voteCounts[v.option_id] || 0) + 1;
     });
-    
+
     return {
       id: poll.id,
       question: poll.question,
@@ -423,7 +441,7 @@ export const getPolls = async (sessionId: string): Promise<Poll[]> => {
       totalVotes: votes?.length || 0
     };
   }));
-  
+
   return pollsWithVotes;
 };
 
@@ -435,7 +453,7 @@ export const getActivePoll = async (sessionId: string): Promise<Poll | null> => 
 export const votePoll = async (pollId: string, optionId: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  
+
   const { data, error } = await supabase
     .from('poll_votes')
     .insert({
@@ -445,7 +463,7 @@ export const votePoll = async (pollId: string, optionId: string) => {
     })
     .select()
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -483,9 +501,9 @@ export const getRooms = async (eventId: string): Promise<Room[]> => {
     .select('*')
     .eq('event_id', eventId)
     .order('is_main_stage', { ascending: false });
-  
+
   if (error) throw error;
-  
+
   return data.map(r => ({
     id: r.id,
     name: r.name,
@@ -528,9 +546,9 @@ export const getEventAttendees = async (eventId: string) => {
     `)
     .eq('event_id', eventId)
     .is('left_at', null);
-  
+
   if (error) throw error;
-  
+
   return data.map(eu => ({
     ...eu.profiles,
     joinedAt: eu.joined_at,
@@ -542,7 +560,7 @@ export const getEventAttendees = async (eventId: string) => {
 export const joinEvent = async (eventId: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  
+
   const { data, error } = await supabase
     .from('event_users')
     .upsert({
@@ -553,7 +571,7 @@ export const joinEvent = async (eventId: string) => {
     })
     .select()
     .single();
-  
+
   if (error) throw error;
   return data;
 };
@@ -561,12 +579,12 @@ export const joinEvent = async (eventId: string) => {
 export const leaveEvent = async (eventId: string) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Not authenticated');
-  
+
   const { error } = await supabase
     .from('event_users')
     .update({ left_at: new Date().toISOString() })
     .eq('event_id', eventId)
     .eq('user_id', user.id);
-  
+
   if (error) throw error;
 };
