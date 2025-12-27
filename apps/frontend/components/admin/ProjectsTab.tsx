@@ -3,7 +3,8 @@ import { Project, Language } from '../../types';
 import { TRANSLATIONS } from '../../constants';
 import {
   FolderPlus, Trash2, CheckCircle, Radio, FileEdit, Play, Eye,
-  ToggleLeft, ToggleRight, X, Calendar, Users, Plus, AlertTriangle, Copy, Key
+  ToggleLeft, ToggleRight, X, Calendar, Users, Plus, AlertTriangle, Copy, Key,
+  Share2, ExternalLink
 } from 'lucide-react';
 
 interface ProjectsTabProps {
@@ -29,7 +30,9 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showStreamingDetails, setShowStreamingDetails] = useState<string | null>(null);
+  const [showShareModal, setShowShareModal] = useState<string | null>(null);
   const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedShareUrl, setCopiedShareUrl] = useState(false);
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
@@ -92,6 +95,40 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
   };
 
   const rtmpUrl = 'rtmp://ingest.livevideo.com.br:1936/live';
+
+  const getShareUrl = (projectId: string) => {
+    const baseUrl = window.location.origin;
+    return `${baseUrl}/watch/${projectId}`;
+  };
+
+  const handleCopyShareUrl = async (projectId: string) => {
+    try {
+      const url = getShareUrl(projectId);
+      await navigator.clipboard.writeText(url);
+      setCopiedShareUrl(true);
+      setTimeout(() => setCopiedShareUrl(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy share URL:', err);
+    }
+  };
+
+  const handleShareNative = async (project: Project) => {
+    const url = getShareUrl(project.id);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: project.name,
+          text: project.description || (lang === 'pt' ? 'Assista ao vivo!' : 'Watch live!'),
+          url
+        });
+      } catch (err) {
+        // User cancelled or error - fallback to copy
+        handleCopyShareUrl(project.id);
+      }
+    } else {
+      handleCopyShareUrl(project.id);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -201,6 +238,15 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
 
                 {/* Actions */}
                 <div className="flex items-center gap-2">
+                  {/* Share Button */}
+                  <button
+                    onClick={() => setShowShareModal(project.id)}
+                    className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors"
+                    title={lang === 'pt' ? 'Compartilhar' : 'Share'}
+                  >
+                    <Share2 className="w-4 h-4" />
+                  </button>
+
                   {/* RTMP Key Button */}
                   <button
                     onClick={() => setShowStreamingDetails(project.id)}
@@ -449,6 +495,111 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Share Modal */}
+      {showShareModal && (() => {
+        const project = projects.find(p => p.id === showShareModal);
+        if (!project) return null;
+
+        const shareUrl = getShareUrl(project.id);
+
+        return (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg">
+              <div className="flex items-center justify-between p-4 border-b border-slate-700">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Share2 className="w-5 h-5" />
+                  {lang === 'pt' ? 'Compartilhar Stream' : 'Share Stream'}
+                </h3>
+                <button
+                  onClick={() => setShowShareModal(null)}
+                  className="text-slate-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div>
+                  <h4 className="text-sm font-bold text-white mb-2">{project.name}</h4>
+                  <p className="text-sm text-slate-400 mb-4">
+                    {lang === 'pt'
+                      ? 'Compartilhe este link com seu público para assistir ao vivo.'
+                      : 'Share this link with your audience to watch live.'}
+                  </p>
+                </div>
+
+                <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                  <label className="block text-xs font-bold text-slate-400 mb-2">
+                    {lang === 'pt' ? 'Link Público' : 'Public Link'}
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={shareUrl}
+                      readOnly
+                      className="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white font-mono"
+                    />
+                    <button
+                      onClick={() => handleCopyShareUrl(project.id)}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded transition-colors flex items-center gap-2"
+                    >
+                      <Copy className="w-4 h-4" />
+                      {copiedShareUrl ? (lang === 'pt' ? 'Copiado!' : 'Copied!') : (lang === 'pt' ? 'Copiar' : 'Copy')}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleShareNative(project)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-3 rounded-lg font-medium transition-colors"
+                  >
+                    <Share2 className="w-5 h-5" />
+                    {lang === 'pt' ? 'Compartilhar' : 'Share'}
+                  </button>
+                  <a
+                    href={shareUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 bg-slate-700 hover:bg-slate-600 text-white px-4 py-3 rounded-lg font-medium transition-colors"
+                  >
+                    <ExternalLink className="w-5 h-5" />
+                    {lang === 'pt' ? 'Abrir' : 'Open'}
+                  </a>
+                </div>
+
+                {project.status === 'LIVE' && (
+                  <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3 flex items-center gap-2">
+                    <Radio className="w-4 h-4 text-emerald-400 animate-pulse" />
+                    <p className="text-sm text-emerald-300">
+                      {lang === 'pt' ? 'Este stream está ao vivo agora!' : 'This stream is live now!'}
+                    </p>
+                  </div>
+                )}
+
+                {project.status === 'DRAFT' && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+                    <p className="text-xs text-amber-300">
+                      <strong>{lang === 'pt' ? 'Nota:' : 'Note:'}</strong>{' '}
+                      {lang === 'pt'
+                        ? 'Este projeto está em rascunho. Inicie o stream RTMP para que os espectadores possam assistir.'
+                        : 'This project is in draft. Start the RTMP stream so viewers can watch.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-700">
+                <button
+                  onClick={() => setShowShareModal(null)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                >
+                  {lang === 'pt' ? 'Fechar' : 'Close'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
