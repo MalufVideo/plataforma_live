@@ -1,4 +1,5 @@
 import NodeMediaServer from 'node-media-server';
+import http from 'http';
 import { supabase } from '../config/database.js';
 import dotenv from 'dotenv';
 
@@ -6,10 +7,24 @@ dotenv.config();
 
 let nms = null;
 let ioInstance = null;
+let corsProxyServer = null;
+
+// CORS allowed origins
+const ALLOWED_ORIGINS = [
+    'https://www.livevideo.com.br',
+    'https://livevideo.com.br',
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
 
 // Check if ffmpeg exists before enabling transcoding
 const ffmpegPath = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
 const enableTranscoding = process.env.ENABLE_TRANSCODING === 'true';
+
+// Internal port for Node Media Server (not exposed externally)
+const NMS_INTERNAL_HTTP_PORT = 8002;
+// External port for CORS proxy
+const CORS_PROXY_PORT = parseInt(process.env.RTMP_HTTP_PORT) || 8001;
 
 const config = {
     rtmp: {
@@ -20,7 +35,7 @@ const config = {
         ping_timeout: 60
     },
     http: {
-        port: parseInt(process.env.RTMP_HTTP_PORT) || 8001,
+        port: NMS_INTERNAL_HTTP_PORT,
         allow_origin: '*',
         mediaroot: process.env.HLS_OUTPUT_DIR || './media'
     }
@@ -123,6 +138,71 @@ function notifyStreamStatus(projectId, status, streamKey) {
 }
 
 /**
+ * Create CORS proxy server that forwards to Node Media Server
+ */
+function createCorsProxy() {
+    const proxy = http.createServer((req, res) => {
+        const origin = req.headers.origin;
+
+        // Handle CORS preflight
+        if (req.method === 'OPTIONS') {
+            if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*'))) {
+                res.setHeader('Access-Control-Allow-Origin', origin);
+            } else {
+                res.setHeader('Access-Control-Allow-Origin', '*');
+            }
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+            res.setHeader('Access-Control-Max-Age', '86400');
+            res.writeHead(204);
+            res.end();
+            return;
+        }
+
+        // Proxy request to internal NMS server
+        const options = {
+            hostname: 'localhost',
+            port: NMS_INTERNAL_HTTP_PORT,
+            path: req.url,
+            method: req.method,
+            headers: req.headers
+        };
+
+        const proxyReq = http.request(options, (proxyRes) => {
+            // Add CORS headers to response
+            if (origin && (ALLOWED_ORIGINS.includes(origin) || ALLOWED_ORIGINS.includes('*'))) {
+                res.setHeader('Access-Control-Allow-Origin', origin);
+            } else {
+                res.setHeader('Access-Control-Allow-Origin', '*');
+            }
+            res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Range');
+            res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range');
+
+            // Copy other headers from NMS response
+            Object.keys(proxyRes.headers).forEach(key => {
+                if (key.toLowerCase() !== 'access-control-allow-origin') {
+                    res.setHeader(key, proxyRes.headers[key]);
+                }
+            });
+
+            res.writeHead(proxyRes.statusCode);
+            proxyRes.pipe(res);
+        });
+
+        proxyReq.on('error', (err) => {
+            console.error('[CORS Proxy] Error:', err.message);
+            res.writeHead(502);
+            res.end('Bad Gateway');
+        });
+
+        req.pipe(proxyReq);
+    });
+
+    return proxy;
+}
+
+/**
  * Start the RTMP Media Server
  */
 export function startRtmpServer(io = null) {
@@ -193,8 +273,14 @@ export function startRtmpServer(io = null) {
 
     nms.run();
 
+    // Start CORS proxy server on the external port
+    corsProxyServer = createCorsProxy();
+    corsProxyServer.listen(CORS_PROXY_PORT, () => {
+        console.log(`[CORS Proxy] Running on port ${CORS_PROXY_PORT}, forwarding to NMS on ${NMS_INTERNAL_HTTP_PORT}`);
+    });
+
     console.log(`[RTMP] Server started on rtmp://localhost:${config.rtmp.port}/live`);
-    console.log(`[RTMP] HTTP-FLV available on http://localhost:${config.http.port}`);
+    console.log(`[RTMP] HTTP-FLV available on http://localhost:${CORS_PROXY_PORT} (with CORS)`);
 
     return nms;
 }
@@ -203,6 +289,11 @@ export function startRtmpServer(io = null) {
  * Stop the RTMP server
  */
 export function stopRtmpServer() {
+    if (corsProxyServer) {
+        corsProxyServer.close();
+        corsProxyServer = null;
+        console.log('[CORS Proxy] Server stopped');
+    }
     if (nms) {
         nms.stop();
         nms = null;
@@ -216,7 +307,7 @@ export function stopRtmpServer() {
 export function getRtmpServerInfo() {
     return {
         rtmpUrl: `rtmp://localhost:${config.rtmp.port}/live`,
-        httpFlvUrl: `http://localhost:${config.http.port}`,
+        httpFlvUrl: `http://localhost:${CORS_PROXY_PORT}`,
         isRunning: nms !== null
     };
 }
