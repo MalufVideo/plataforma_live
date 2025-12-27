@@ -5,8 +5,8 @@ import { EngagementPanel } from './components/EngagementPanel';
 import { AdminConsole } from './pages/AdminConsole';
 import { BreakoutRooms } from './pages/BreakoutRooms';
 import { LoginPage } from './pages/LoginPage';
-import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User } from './types';
-import { CURRENT_USER, MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS } from './constants';
+import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
+import { CURRENT_USER, MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -26,6 +26,10 @@ const App: React.FC = () => {
   const [poll, setPoll] = useState<Poll>(INITIAL_POLL);
   const [survey, setSurvey] = useState<Survey>(INITIAL_SURVEY);
   const [viewers, setViewers] = useState(MOCK_SESSION.viewers);
+
+  // Projects State
+  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(MOCK_PROJECTS[0]?.id || null);
 
   // Simulated WebSocket Effect
   useEffect(() => {
@@ -93,6 +97,41 @@ const App: React.FC = () => {
     setSource(roomId === 'r1' ? StreamSource.CUSTOM_RTMP : StreamSource.HLS);
   };
 
+  // Project Management Handlers
+  const handleCreateProject = (projectData: Omit<Project, 'id' | 'createdAt' | 'viewers'>) => {
+    const newProject: Project = {
+      ...projectData,
+      id: `proj-${Date.now()}`,
+      createdAt: Date.now(),
+      viewers: 0
+    };
+    setProjects(prev => [newProject, ...prev]);
+    setCurrentProjectId(newProject.id);
+  };
+
+  const handleSelectProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setCurrentProjectId(projectId);
+      if (project.youtubeVideoId) {
+        setYoutubeVideoId(project.youtubeVideoId);
+      }
+    }
+  };
+
+  const handleDeleteProject = (projectId: string) => {
+    setProjects(prev => prev.filter(p => p.id !== projectId));
+    if (currentProjectId === projectId) {
+      setCurrentProjectId(projects.find(p => p.id !== projectId)?.id || null);
+    }
+  };
+
+  const handleToggleOnDemand = (projectId: string) => {
+    setProjects(prev => prev.map(p =>
+      p.id === projectId ? { ...p, isOnDemand: !p.isOnDemand } : p
+    ));
+  };
+
   const t = TRANSLATIONS[lang].stage;
 
   if (!user) {
@@ -112,6 +151,12 @@ const App: React.FC = () => {
         questions={questions}
         lang={lang}
         onLogout={handleLogout}
+        projects={projects}
+        currentProjectId={currentProjectId}
+        onCreateProject={handleCreateProject}
+        onSelectProject={handleSelectProject}
+        onDeleteProject={handleDeleteProject}
+        onToggleOnDemand={handleToggleOnDemand}
       />
     );
   }

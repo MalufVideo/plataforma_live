@@ -123,3 +123,19 @@ export interface UserActivity {
     details?: string;
   }[];
 }
+
+export type ProjectStatus = 'DRAFT' | 'LIVE' | 'ENDED';
+
+export interface Project {
+  id: string;
+  name: string;
+  description: string;
+  status: ProjectStatus;
+  isOnDemand: boolean; // If true, ended project is available for on-demand viewing
+  createdAt: number;
+  startedAt?: number;
+  endedAt?: number;
+  youtubeVideoId?: string;
+  thumbnail?: string;
+  viewers: number;
+}

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { StreamSource, Poll, Session, Survey, Language, Message, Question } from '../types';
+import { StreamSource, Poll, Session, Survey, Language, Message, Question, Project } from '../types';
 import { TRANSLATIONS, INITIAL_POLL, INITIAL_SURVEY } from '../constants';
 import {
   ArrowLeft, Activity, LayoutDashboard, Radio, BarChart3,
-  Server, MessageSquare, Settings, Crown, Wifi, Play
+  Server, MessageSquare, Settings, Crown, Wifi, Play, FolderKanban
 } from 'lucide-react';
 import { DashboardTab } from '../components/admin/DashboardTab';
 import { StreamSourcesTab } from '../components/admin/StreamSourcesTab';
@@ -11,6 +11,7 @@ import { AnalyticsTab } from '../components/admin/AnalyticsTab';
 import { TranscodingTab } from '../components/admin/TranscodingTab';
 import { EngagementTab } from '../components/admin/EngagementTab';
 import { ReportsTab } from '../components/admin/ReportsTab';
+import { ProjectsTab } from '../components/admin/ProjectsTab';
 
 interface AdminConsoleProps {
   session: Session;
@@ -23,11 +24,18 @@ interface AdminConsoleProps {
   questions: Question[];
   lang: Language;
   onLogout: () => void;
+  projects: Project[];
+  currentProjectId: string | null;
+  onCreateProject: (project: Omit<Project, 'id' | 'createdAt' | 'viewers'>) => void;
+  onSelectProject: (projectId: string) => void;
+  onDeleteProject: (projectId: string) => void;
+  onToggleOnDemand: (projectId: string) => void;
 }
 
-type AdminTab = 'dashboard' | 'sources' | 'analytics' | 'reports' | 'transcoding' | 'engagement' | 'settings';
+type AdminTab = 'projects' | 'dashboard' | 'sources' | 'analytics' | 'reports' | 'transcoding' | 'engagement' | 'settings';
 
 const TAB_CONFIG: { id: AdminTab; label: string; icon: React.ElementType; premium?: boolean }[] = [
+  { id: 'projects', label: 'Projects', icon: FolderKanban },
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'sources', label: 'Stream Sources', icon: Radio },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -47,9 +55,15 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   messages,
   questions,
   lang,
-  onLogout
+  onLogout,
+  projects,
+  currentProjectId,
+  onCreateProject,
+  onSelectProject,
+  onDeleteProject,
+  onToggleOnDemand
 }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<AdminTab>('projects');
   const [isPremium, setIsPremium] = useState(true); // Toggle for demo
   const [elapsedTime, setElapsedTime] = useState(0);
   const [poll, setPoll] = useState<Poll>(INITIAL_POLL);
@@ -164,6 +178,18 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
 
       {/* Tab Content */}
       <main className="flex-1 p-6 overflow-y-auto">
+        {activeTab === 'projects' && (
+          <ProjectsTab
+            projects={projects}
+            currentProjectId={currentProjectId}
+            onCreateProject={onCreateProject}
+            onSelectProject={onSelectProject}
+            onDeleteProject={onDeleteProject}
+            onToggleOnDemand={onToggleOnDemand}
+            lang={lang}
+          />
+        )}
+
         {activeTab === 'dashboard' && (
           <DashboardTab viewers={session.viewers} isPremium={isPremium} />
         )}

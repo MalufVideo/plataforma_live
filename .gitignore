@@ -15,6 +15,12 @@ dist-ssr
 # Backend folder (kept locally only)
 backend
 
+# 3-Layer Architecture
+.tmp/
+.env
+credentials.json
+token.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

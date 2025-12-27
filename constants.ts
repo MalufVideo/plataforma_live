@@ -1,4 +1,4 @@
-import { User, UserRole, Session, StreamSource, Poll, Message, Question, Room, Survey, Language, UserActivity } from './types';
+import { User, UserRole, Session, StreamSource, Poll, Message, Question, Room, Survey, Language, UserActivity, Project } from './types';
 
 export const TRANSLATIONS = {
   pt: {
@@ -98,6 +98,30 @@ export const TRANSLATIONS = {
       title: 'Sessões ao Vivo & Breakouts',
       subtitle: 'Escolha uma trilha para entrar nas sessões interativas.',
       join: 'Entrar na Sessão'
+    },
+    projects: {
+      title: 'Gerenciar Projetos',
+      createNew: 'Novo Projeto',
+      selectProject: 'Selecionar Projeto',
+      deleteProject: 'Excluir Projeto',
+      projectName: 'Nome do Projeto',
+      projectDescription: 'Descrição',
+      status: 'Status',
+      draft: 'Rascunho',
+      live: 'Ao Vivo',
+      ended: 'Encerrado',
+      onDemand: 'Sob Demanda',
+      onDemandDesc: 'Disponível para visualização após término',
+      enableOnDemand: 'Ativar On-Demand',
+      disableOnDemand: 'Desativar On-Demand',
+      currentProject: 'Projeto Atual',
+      noProjects: 'Nenhum projeto criado',
+      confirmDelete: 'Tem certeza que deseja excluir este projeto?',
+      create: 'Criar',
+      cancel: 'Cancelar',
+      save: 'Salvar',
+      viewers: 'Visualizações',
+      createdAt: 'Criado em'
     }
   },
   en: {
@@ -197,6 +221,30 @@ export const TRANSLATIONS = {
       title: 'Live Sessions & Breakouts',
       subtitle: 'Choose a track to join live interactive sessions.',
       join: 'Join Session'
+    },
+    projects: {
+      title: 'Manage Projects',
+      createNew: 'New Project',
+      selectProject: 'Select Project',
+      deleteProject: 'Delete Project',
+      projectName: 'Project Name',
+      projectDescription: 'Description',
+      status: 'Status',
+      draft: 'Draft',
+      live: 'Live',
+      ended: 'Ended',
+      onDemand: 'On Demand',
+      onDemandDesc: 'Available for viewing after event ends',
+      enableOnDemand: 'Enable On-Demand',
+      disableOnDemand: 'Disable On-Demand',
+      currentProject: 'Current Project',
+      noProjects: 'No projects created',
+      confirmDelete: 'Are you sure you want to delete this project?',
+      create: 'Create',
+      cancel: 'Cancel',
+      save: 'Save',
+      viewers: 'Views',
+      createdAt: 'Created at'
     }
   }
 };
@@ -227,6 +275,57 @@ export const MOCK_ROOMS: Room[] = [
   { id: 'r2', name: 'Sala A: Segurança', speaker: 'James T.', topic: 'Streaming Zero Trust', viewers: 450, thumbnail: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=800&q=80' },
   { id: 'r3', name: 'Sala B: Engajamento', speaker: 'Emily R.', topic: 'Estratégias de Gamificação', viewers: 890, thumbnail: 'https://images.unsplash.com/photo-1551818255-e6e10975bc17?w=800&q=80' },
   { id: 'r4', name: 'Workshop: React 19', speaker: 'Dan A.', topic: 'Sessão de Live Coding', viewers: 1200, thumbnail: 'https://images.unsplash.com/photo-1587620962725-abab7fe55159?w=800&q=80' },
+];
+
+export const MOCK_PROJECTS: Project[] = [
+  {
+    id: 'proj-1',
+    name: 'Live Streaming Test Event',
+    description: 'Testing live streaming functionality with YouTube video source.',
+    status: 'LIVE',
+    isOnDemand: false,
+    createdAt: Date.now() - 86400000,
+    startedAt: Date.now() - 3600000,
+    youtubeVideoId: 'cu4xksmv7ho',
+    thumbnail: 'https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=800&q=80',
+    viewers: 12450
+  },
+  {
+    id: 'proj-2',
+    name: 'Tech Conference 2024',
+    description: 'Annual technology conference with keynotes and workshops.',
+    status: 'ENDED',
+    isOnDemand: true,
+    createdAt: Date.now() - 604800000,
+    startedAt: Date.now() - 604800000 + 3600000,
+    endedAt: Date.now() - 604800000 + 10800000,
+    youtubeVideoId: 'dQw4w9WgXcQ',
+    thumbnail: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80',
+    viewers: 8500
+  },
+  {
+    id: 'proj-3',
+    name: 'Product Launch Event',
+    description: 'New product reveal and demo session.',
+    status: 'ENDED',
+    isOnDemand: false,
+    createdAt: Date.now() - 1209600000,
+    startedAt: Date.now() - 1209600000 + 7200000,
+    endedAt: Date.now() - 1209600000 + 14400000,
+    youtubeVideoId: 'jNQXAC9IVRw',
+    thumbnail: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&q=80',
+    viewers: 5200
+  },
+  {
+    id: 'proj-4',
+    name: 'Upcoming Webinar',
+    description: 'Draft event for future webinar.',
+    status: 'DRAFT',
+    isOnDemand: false,
+    createdAt: Date.now() - 172800000,
+    thumbnail: 'https://images.unsplash.com/photo-1591115765373-5207764f72e7?w=800&q=80',
+    viewers: 0
+  }
 ];
 
 export const INITIAL_SURVEY: Survey = {
