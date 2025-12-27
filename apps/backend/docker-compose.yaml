@@ -4,15 +4,15 @@ services:
     build: .
     ports:
       - "3000" # Expose internally for Coolify Proxy
-      - "1935:1935" # RTMP must be public
-      - "8000:8000" # HLS must be public
+      - "1936:1936" # RTMP shifted to 1936
+      - "8001:8001" # HLS shifted to 8001
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
       - CORS_ORIGIN=${CORS_ORIGIN}
       # Optional: Add these to your Coolify Env Vars for full stream control
-      - RTMP_PORT=1935
-      - RTMP_HTTP_PORT=8000
+      - RTMP_PORT=1936
+      - RTMP_HTTP_PORT=8001
       - RTMP_SECRET=${RTMP_SECRET}
     restart: unless-stopped
