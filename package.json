@@ -2,6 +2,9 @@
     "name": "plataforma-live-monorepo",
     "private": true,
     "description": "Monorepo for Plataforma Live (Frontend & Backend)",
+    "engines": {
+        "node": "20.x"
+    },
     "workspaces": [
         "apps/*"
     ],
