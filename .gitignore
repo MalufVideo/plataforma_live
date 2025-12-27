@@ -1,30 +1,32 @@
+# Monorepo Node Modules
+node_modules/
+apps/*/node_modules/
+
+# Build outputs
+dist/
+apps/*/dist/
+dist-ssr/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+apps/*/.env
+apps/*/.env.local
+
 # Logs
 logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
-node_modules
-dist
-dist-ssr
-*.local
-
-# Backend folder (kept locally only)
-backend
 
 # 3-Layer Architecture
 .tmp/
-.env
 credentials.json
 token.json
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# Editor
+.vscode/
+.idea/
 .DS_Store
 *.suo
 *.ntvs*

@@ -1,23 +1,19 @@
 {
-  "name": "onav-live",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.45.0",
-    "react": "^19.2.0",
-    "lucide-react": "^0.555.0",
-    "react-dom": "^19.2.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
+    "name": "plataforma-live-monorepo",
+    "private": true,
+    "description": "Monorepo for Plataforma Live (Frontend & Backend)",
+    "workspaces": [
+        "apps/*"
+    ],
+    "scripts": {
+        "dev:frontend": "npm run dev -w apps/frontend",
+        "dev:backend": "npm run dev -w apps/backend",
+        "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+        "build:frontend": "npm run build -w apps/frontend",
+        "build:backend": "npm run build -w apps/backend",
+        "install:all": "npm install"
+    },
+    "devDependencies": {
+        "concurrently": "^8.2.2"
+    }
 }

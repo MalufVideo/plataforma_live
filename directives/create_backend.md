@@ -44,11 +44,13 @@ CORS_ORIGIN=https://your-frontend-domain.com
 ## Output Deliverables
 
 ### 1. Backend Folder Structure
-Create a new folder (outside the frontend repo or in a separate workspace) with this structure:
+Reorganize or create the backend in `apps/backend`:
 
 ```
-plataforma_live_backend/
-├── Dockerfile                    # Multi-stage build for Coolify
+plataforma_live/
+├── apps/
+│   ├── backend/
+│   │   ├── Dockerfile
 ├── docker-compose.yml            # Local dev + deployment config
 ├── package.json                  # Dependencies
 ├── .env.example                  # Environment template
