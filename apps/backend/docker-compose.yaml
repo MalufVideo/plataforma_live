@@ -3,9 +3,9 @@ services:
   api:
     build: .
     ports:
-      - "3000:3000" # API & WebSockets
-      - "1935:1935" # RTMP Streaming port (for OBS)
-      - "8000:8000" # RTMP HTTP/HLS port
+      - "3000" # Expose internally for Coolify Proxy
+      - "1935:1935" # RTMP must be public
+      - "8000:8000" # HLS must be public
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}
