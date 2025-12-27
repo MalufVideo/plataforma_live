@@ -39,10 +39,9 @@ const config = {
 async function validateStreamKey(streamKey) {
     try {
         const { data, error } = await supabase
-            .from('rtmp_ingest_configs')
-            .select('id, project_id, is_active')
-            .eq('stream_key', streamKey)
-            .eq('is_active', true)
+            .from('projects')
+            .select('id, name, status, owner_id')
+            .eq('rtmp_stream_key', streamKey)
             .single();
 
         if (error || !data) {
@@ -50,7 +49,15 @@ async function validateStreamKey(streamKey) {
             return null;
         }
 
-        return data;
+        // Return in format expected by other functions
+        return {
+            id: data.id,
+            project_id: data.id,  // Use project ID
+            name: data.name,
+            status: data.status,
+            owner_id: data.owner_id,
+            is_active: true
+        };
     } catch (err) {
         console.error('[RTMP] Stream key validation error:', err);
         return null;
@@ -63,19 +70,26 @@ async function validateStreamKey(streamKey) {
 async function updateStreamStatus(streamKey, status) {
     try {
         const updateData = {
+            status: status,
             updated_at: new Date().toISOString()
         };
 
+        // Update started_at when stream goes live
         if (status === 'LIVE') {
-            updateData.last_connected_at = new Date().toISOString();
+            updateData.started_at = new Date().toISOString();
+        }
+
+        // Update ended_at when stream ends
+        if (status === 'ENDED') {
+            updateData.ended_at = new Date().toISOString();
         }
 
         await supabase
-            .from('rtmp_ingest_configs')
+            .from('projects')
             .update(updateData)
-            .eq('stream_key', streamKey);
+            .eq('rtmp_stream_key', streamKey);
 
-        console.log(`[RTMP] Stream ${streamKey} status updated to ${status}`);
+        console.log(`[RTMP] Project stream status updated to ${status} for key ${streamKey}`);
     } catch (err) {
         console.error('[RTMP] Error updating stream status:', err);
     }
@@ -154,8 +168,8 @@ export function startRtmpServer(io = null) {
 
         const ingestConfig = await validateStreamKey(streamKey);
         if (ingestConfig) {
-            await updateStreamStatus(streamKey, 'OFFLINE');
-            notifyStreamStatus(ingestConfig.project_id, 'OFFLINE', streamKey);
+            await updateStreamStatus(streamKey, 'ENDED');
+            notifyStreamStatus(ingestConfig.project_id, 'ENDED', streamKey);
         }
     });
 

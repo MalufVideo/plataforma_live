@@ -138,7 +138,12 @@ export const TRANSLATIONS = {
       cancel: 'Cancelar',
       save: 'Salvar',
       viewers: 'Visualizações',
-      createdAt: 'Criado em'
+      createdAt: 'Criado em',
+      rtmpStreamKey: 'Chave RTMP',
+      rtmpUrl: 'URL RTMP',
+      streamingDetails: 'Detalhes de Transmissão',
+      copyKey: 'Copiar Chave',
+      keyCopied: 'Chave copiada!'
     }
   },
   en: {
@@ -278,7 +283,12 @@ export const TRANSLATIONS = {
       cancel: 'Cancel',
       save: 'Save',
       viewers: 'Views',
-      createdAt: 'Created at'
+      createdAt: 'Created at',
+      rtmpStreamKey: 'RTMP Stream Key',
+      rtmpUrl: 'RTMP URL',
+      streamingDetails: 'Streaming Details',
+      copyKey: 'Copy Key',
+      keyCopied: 'Key copied!'
     }
   }
 };

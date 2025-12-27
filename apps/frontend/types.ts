@@ -139,4 +139,6 @@ export interface Project {
   youtubeVideoId?: string;
   thumbnail?: string;
   viewers: number;
+  rtmpStreamKey: string; // Unique RTMP stream key for this project
+  ownerId: string; // User ID of the project owner (ADMIN)
 }
