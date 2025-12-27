@@ -17,7 +17,7 @@ interface StreamSourcesTabProps {
 }
 
 // Server URLs
-const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'http://72.60.142.28:8001';
+const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://flv.livevideo.com.br';
 
 export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
   currentSource,

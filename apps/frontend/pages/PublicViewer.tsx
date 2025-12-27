@@ -10,8 +10,8 @@ interface PublicViewerProps {
 }
 
 // Server URLs
-const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'http://72.60.142.28:8001';
-const API_URL = import.meta.env.VITE_API_URL || 'http://72.60.142.28:8000';
+const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://flv.livevideo.com.br';
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.livevideo.com.br';
 
 interface ProjectInfo {
   id: string;
