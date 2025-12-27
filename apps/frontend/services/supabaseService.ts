@@ -588,3 +588,122 @@ export const leaveEvent = async (eventId: string) => {
 
   if (error) throw error;
 };
+
+// =============================================
+// ADMIN: USER MANAGEMENT FUNCTIONS
+// =============================================
+
+export interface ProfileWithStats {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  avatar?: string;
+  company?: string;
+  title?: string;
+  status: string;
+  created_at: string;
+  last_login_at?: string;
+}
+
+export const getAllUsers = async (): Promise<ProfileWithStats[]> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
+};
+
+export const updateUserRole = async (userId: string, role: string): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ role })
+    .eq('id', userId);
+
+  if (error) throw error;
+};
+
+export const deleteUser = async (userId: string): Promise<void> => {
+  // First delete from profiles (cascade should handle related tables)
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .delete()
+    .eq('id', userId);
+
+  if (profileError) throw profileError;
+};
+
+export const getUserStats = async () => {
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('role, status, created_at');
+
+  if (error) throw error;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const thisWeek = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const totalUsers = profiles?.length || 0;
+  const onlineUsers = profiles?.filter(p => p.status === 'ONLINE').length || 0;
+  const newUsersToday = profiles?.filter(p => new Date(p.created_at) >= today).length || 0;
+  const newUsersThisWeek = profiles?.filter(p => new Date(p.created_at) >= thisWeek).length || 0;
+  const newUsersThisMonth = profiles?.filter(p => new Date(p.created_at) >= thisMonth).length || 0;
+
+  const roleDistribution = {
+    ATTENDEE: profiles?.filter(p => p.role === 'ATTENDEE').length || 0,
+    ADMIN: profiles?.filter(p => p.role === 'ADMIN').length || 0,
+    MASTER_ADMIN: profiles?.filter(p => p.role === 'MASTER_ADMIN').length || 0,
+    SPEAKER: profiles?.filter(p => p.role === 'SPEAKER').length || 0,
+    MODERATOR: profiles?.filter(p => p.role === 'MODERATOR').length || 0,
+  };
+
+  return {
+    totalUsers,
+    onlineUsers,
+    newUsersToday,
+    newUsersThisWeek,
+    newUsersThisMonth,
+    roleDistribution,
+  };
+};
+
+// =============================================
+// ADMIN: PLATFORM METRICS
+// =============================================
+
+export const getPlatformMetrics = async () => {
+  // Get event stats
+  const { data: events } = await supabase
+    .from('events')
+    .select('id, status, created_at');
+
+  // Get message count
+  const { count: messageCount } = await supabase
+    .from('messages')
+    .select('*', { count: 'exact', head: true });
+
+  // Get question count
+  const { count: questionCount } = await supabase
+    .from('questions')
+    .select('*', { count: 'exact', head: true });
+
+  // Get poll count
+  const { count: pollCount } = await supabase
+    .from('polls')
+    .select('*', { count: 'exact', head: true });
+
+  const liveEvents = events?.filter(e => e.status === 'LIVE').length || 0;
+  const totalEvents = events?.length || 0;
+
+  return {
+    totalEvents,
+    liveEvents,
+    totalMessages: messageCount || 0,
+    totalQuestions: questionCount || 0,
+    totalPolls: pollCount || 0,
+  };
+};

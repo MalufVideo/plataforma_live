@@ -3,12 +3,13 @@ import { Navigation } from './components/Navigation';
 import { VideoPlayer } from './components/VideoPlayer';
 import { EngagementPanel } from './components/EngagementPanel';
 import { AdminConsole } from './pages/AdminConsole';
+import { MasterAdminDashboard } from './pages/MasterAdminDashboard';
 import { BreakoutRooms } from './pages/BreakoutRooms';
 import { LoginPage } from './pages/LoginPage';
 import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
-import { CURRENT_USER, MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
+import { MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
-import { getCurrentUser, onAuthStateChange, supabase } from './services/supabaseService';
+import { getCurrentUser, onAuthStateChange, signOut } from './services/supabaseService';
 
 const App: React.FC = () => {
   // Authentication State
@@ -33,28 +34,12 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(MOCK_PROJECTS[0]?.id || null);
 
-  // Handle OAuth callback and auth state changes
+  // Check auth state on mount and listen for changes
   useEffect(() => {
     const checkAuth = async () => {
       try {
         const appUser = await getCurrentUser();
-
         if (appUser) {
-          // Check for intended role from OAuth flow
-          const intendedRole = localStorage.getItem('intended_role') as UserRole | null;
-
-          if (intendedRole) {
-            // Apply the intended role and clear it
-            appUser.role = intendedRole;
-            localStorage.removeItem('intended_role');
-
-            // Optionally update profile role in database
-            await supabase
-              .from('profiles')
-              .update({ role: intendedRole })
-              .eq('id', appUser.id);
-          }
-
           setUser(appUser);
         }
       } catch (error) {
@@ -71,11 +56,6 @@ const App: React.FC = () => {
       if (authUser) {
         const appUser = await getCurrentUser();
         if (appUser) {
-          const intendedRole = localStorage.getItem('intended_role') as UserRole | null;
-          if (intendedRole) {
-            appUser.role = intendedRole;
-            localStorage.removeItem('intended_role');
-          }
           setUser(appUser);
         }
       } else {
@@ -86,17 +66,14 @@ const App: React.FC = () => {
     return () => subscription?.unsubscribe();
   }, []);
 
-  // handleLogin is now only used as a fallback/prop requirement
-  // The actual login flow uses Google OAuth
-  const handleLogin = (role: UserRole) => {
-    // This is called by LoginPage but won't actually be used
-    // since LoginPage now triggers Google OAuth
-    localStorage.setItem('intended_role', role);
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    setActiveTab('stage');
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setUser(null);
+      setActiveTab('stage');
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   const handleSendMessage = (text: string) => {
@@ -180,10 +157,23 @@ const App: React.FC = () => {
     );
   }
 
+  // Show login page if not authenticated
   if (!user) {
-    return <LoginPage onLogin={handleLogin} lang={lang} setLang={setLang} />;
+    return <LoginPage lang={lang} setLang={setLang} />;
   }
 
+  // Show Master Admin Dashboard for MASTER_ADMIN role
+  if (user.role === UserRole.MASTER_ADMIN) {
+    return (
+      <MasterAdminDashboard
+        currentUser={user}
+        lang={lang}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // Show Producer/Admin Console for ADMIN role
   if (user.role === UserRole.ADMIN) {
     return (
       <AdminConsole
@@ -207,6 +197,7 @@ const App: React.FC = () => {
     );
   }
 
+  // Show attendee view for ATTENDEE, SPEAKER, MODERATOR roles
   return (
     <div className="flex flex-col md:flex-row h-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
       <Navigation activeTab={activeTab} setActiveTab={setActiveTab} lang={lang} setLang={setLang} onLogout={handleLogout} />
@@ -286,7 +277,7 @@ const App: React.FC = () => {
 
             <div className={`
                 fixed lg:relative inset-0 lg:inset-auto z-30 lg:z-auto bg-slate-900 lg:bg-transparent lg:w-96
-                transition-transform duration-300 transform 
+                transition-transform duration-300 transform
                 ${activeTab === 'stage' ? '' : 'hidden'}
                 ${showMobileChat ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
             `}>
