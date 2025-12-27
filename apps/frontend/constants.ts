@@ -9,7 +9,24 @@ export const TRANSLATIONS = {
       producer: 'Produtor / Admin',
       producerDesc: 'Acessar sala de controle',
       enter: 'Entrar',
-      welcome: 'Bem-vindo ao'
+      welcome: 'Bem-vindo ao',
+      // Email auth
+      email: 'Email',
+      password: 'Senha',
+      name: 'Nome',
+      signIn: 'Entrar',
+      signUp: 'Criar Conta',
+      orContinueWith: 'ou continue com',
+      useEmail: 'Usar Email',
+      useGoogle: 'Usar Google',
+      noAccount: 'Não tem conta?',
+      hasAccount: 'Já tem conta?',
+      createAccount: 'Criar conta',
+      loginHere: 'Entre aqui',
+      emailRequired: 'Email é obrigatório',
+      passwordRequired: 'Senha é obrigatória',
+      passwordMinLength: 'Senha deve ter pelo menos 6 caracteres',
+      signUpSuccess: 'Conta criada! Verifique seu email para confirmar.'
     },
     nav: {
       stage: 'Palco Principal',
@@ -132,7 +149,24 @@ export const TRANSLATIONS = {
       producer: 'Producer / Admin',
       producerDesc: 'Access master control room',
       enter: 'Enter',
-      welcome: 'Welcome to'
+      welcome: 'Welcome to',
+      // Email auth
+      email: 'Email',
+      password: 'Password',
+      name: 'Name',
+      signIn: 'Sign In',
+      signUp: 'Sign Up',
+      orContinueWith: 'or continue with',
+      useEmail: 'Use Email',
+      useGoogle: 'Use Google',
+      noAccount: "Don't have an account?",
+      hasAccount: 'Already have an account?',
+      createAccount: 'Create account',
+      loginHere: 'Login here',
+      emailRequired: 'Email is required',
+      passwordRequired: 'Password is required',
+      passwordMinLength: 'Password must be at least 6 characters',
+      signUpSuccess: 'Account created! Check your email to confirm.'
     },
     nav: {
       stage: 'Main Stage',

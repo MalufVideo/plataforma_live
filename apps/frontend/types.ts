@@ -2,7 +2,8 @@ export enum UserRole {
   ATTENDEE = 'ATTENDEE',
   SPEAKER = 'SPEAKER',
   MODERATOR = 'MODERATOR',
-  ADMIN = 'ADMIN'
+  ADMIN = 'ADMIN',  // Producer role
+  MASTER_ADMIN = 'MASTER_ADMIN'  // Platform owner/super admin
 }
 
 export enum StreamSource {
