@@ -97,11 +97,11 @@ app.use('/api/transcoding', transcodingRoutes);
 
 // FLV Proxy - streams from /flv/* to internal Node Media Server
 const FLV_INTERNAL_PORT = 8002;
-app.use('/flv', (req, res) => {
+const proxyHandler = (req, res) => {
     const options = {
         hostname: 'localhost',
         port: FLV_INTERNAL_PORT,
-        path: req.url,
+        path: req.baseUrl === '/live' ? `/live${req.url}` : req.url, // Ensure path is correct for NMS
         method: req.method,
         headers: {
             ...req.headers,
@@ -120,11 +120,17 @@ app.use('/flv', (req, res) => {
 
     proxyReq.on('error', (err) => {
         console.error('[FLV Proxy] Error:', err.message);
-        res.status(502).json({ error: 'Stream unavailable' });
+        if (!res.headersSent) {
+            res.status(502).json({ error: 'Stream unavailable' });
+        }
     });
 
     req.pipe(proxyReq);
-});
+};
+
+app.use('/flv', proxyHandler);
+app.use('/live', proxyHandler);
+
 
 // WebSocket Setup
 setupSocketHandlers(io);
