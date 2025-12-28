@@ -3,31 +3,18 @@ services:
   api:
     build: .
     ports:
-      - "3000" # Expose internally for Coolify Proxy
-      - "1936:1936" # RTMP
-      - "8001" # FLV - internal only, accessed via Traefik
+      - "3000" # Express API - accessed via Coolify/Traefik
+      - "1936:1936" # RTMP ingest
     labels:
       - "coolify.managed=true"
       - "traefik.enable=true"
-      # Main API domain
+      # API domain - handles all HTTP traffic including /flv proxy
       - "traefik.http.routers.api-main.rule=Host(`${API_DOMAIN:-api.livevideo.com.br}`)"
       - "traefik.http.routers.api-main.entrypoints=websecure"
       - "traefik.http.routers.api-main.tls=true"
       - "traefik.http.routers.api-main.tls.certresolver=letsencrypt"
       - "traefik.http.routers.api-main.service=api-main"
       - "traefik.http.services.api-main.loadbalancer.server.port=3000"
-      # FLV Stream domain
-      - "traefik.http.routers.api-flv.rule=Host(`flv.livevideo.com.br`)"
-      - "traefik.http.routers.api-flv.entrypoints=websecure"
-      - "traefik.http.routers.api-flv.tls=true"
-      - "traefik.http.routers.api-flv.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.api-flv.service=api-flv"
-      - "traefik.http.services.api-flv.loadbalancer.server.port=8001"
-      # CORS headers for FLV
-      - "traefik.http.middlewares.flv-cors.headers.accesscontrolallowmethods=GET,OPTIONS"
-      - "traefik.http.middlewares.flv-cors.headers.accesscontrolalloworiginlist=https://www.livevideo.com.br,https://livevideo.com.br"
-      - "traefik.http.middlewares.flv-cors.headers.accesscontrolmaxage=86400"
-      - "traefik.http.routers.api-flv.middlewares=flv-cors"
     environment:
       - NODE_ENV=production
       - SUPABASE_URL=${SUPABASE_URL}

@@ -7,8 +7,8 @@ interface LiveStreamPreviewProps {
   isStreaming?: boolean;
 }
 
-// HTTP-FLV server URL - update this to match your backend
-const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://flv.livevideo.com.br';
+// HTTP-FLV server URL - routes through main API domain
+const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://api.livevideo.com.br/flv';
 
 export const LiveStreamPreview: React.FC<LiveStreamPreviewProps> = ({
   streamKey,
