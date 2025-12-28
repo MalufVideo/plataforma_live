@@ -1,27 +1,120 @@
 import React, { useEffect, useRef, useState } from 'react';
+import flvjs from 'flv.js';
 import { StreamSource, UserRole, Language } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Maximize, Volume2, VolumeX, Radio, Settings2, PenTool, Eraser, Activity } from 'lucide-react';
+import { Maximize, Volume2, VolumeX, Radio, Settings2, PenTool, Eraser, Activity, WifiOff, RefreshCw } from 'lucide-react';
+
+// HTTP-FLV server URL - routes through main API domain
+const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://api.livevideo.com.br/flv';
 
 interface VideoPlayerProps {
   source: StreamSource;
   youtubeVideoId?: string;
+  streamKey?: string;
   isLive: boolean;
   role: UserRole;
   lang: Language;
 }
 
-export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId, isLive, role, lang }) => {
-  const [isMuted, setIsMuted] = useState(false);
-  const [volume, setVolume] = useState(0.66); // Volume from 0 to 1
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId, streamKey, isLive, role, lang }) => {
+  const [isMuted, setIsMuted] = useState(true);
+  const [volume, setVolume] = useState(0.66);
   const [showControls, setShowControls] = useState(false);
   const [drawingMode, setDrawingMode] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
+  const playerRef = useRef<flvjs.Player | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [streamError, setStreamError] = useState<string | null>(null);
+  const [stats, setStats] = useState({ bitrate: 0 });
 
   const t = TRANSLATIONS[lang].stage;
+
+  const streamUrl = streamKey ? `${FLV_SERVER_URL}/live/${streamKey}.flv` : '';
+
+  // Initialize FLV player for RTMP streams
+  const initFlvPlayer = () => {
+    if (!videoRef.current || !flvjs.isSupported() || !streamKey) {
+      return;
+    }
+
+    // Destroy existing player
+    if (playerRef.current) {
+      playerRef.current.destroy();
+      playerRef.current = null;
+    }
+
+    setStreamError(null);
+    setIsConnected(false);
+
+    try {
+      const player = flvjs.createPlayer({
+        type: 'flv',
+        url: streamUrl,
+        isLive: true,
+        hasAudio: true,
+        hasVideo: true,
+        cors: true
+      }, {
+        enableWorker: false,
+        enableStashBuffer: false,
+        stashInitialSize: 128,
+        lazyLoad: false,
+        autoCleanupSourceBuffer: true
+      });
+
+      player.attachMediaElement(videoRef.current);
+
+      player.on(flvjs.Events.ERROR, (errType, errDetail) => {
+        console.error('[FLV Player] Error:', errType, errDetail);
+        if (errDetail === 'NetworkError' || errDetail === 'HttpStatusCodeInvalid') {
+          setStreamError('Stream not available. Make sure streaming is active.');
+        } else {
+          setStreamError(`Playback error: ${errDetail}`);
+        }
+        setIsConnected(false);
+      });
+
+      player.on(flvjs.Events.METADATA_ARRIVED, () => {
+        console.log('[FLV Player] Metadata arrived');
+        setIsConnected(true);
+        setStreamError(null);
+      });
+
+      player.on(flvjs.Events.STATISTICS_INFO, (info) => {
+        if (info.speed) {
+          setStats({ bitrate: Math.round(info.speed * 8 / 1000) });
+        }
+      });
+
+      playerRef.current = player;
+      player.load();
+      videoRef.current.muted = true;
+      player.play();
+    } catch (err) {
+      console.error('[FLV Player] Init error:', err);
+      setStreamError('Failed to initialize player');
+    }
+  };
+
+  // Cleanup FLV player
+  useEffect(() => {
+    return () => {
+      if (playerRef.current) {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Initialize FLV player when source is RTMP
+  useEffect(() => {
+    if (source === StreamSource.CUSTOM_RTMP && streamKey && flvjs.isSupported()) {
+      initFlvPlayer();
+    }
+  }, [source, streamKey]);
 
   const startDrawing = (e: React.MouseEvent) => {
     if (!drawingMode || !canvasRef.current) return;
@@ -92,6 +185,63 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
     }
   }, [volume, isMuted]);
 
+  // Render FLV/RTMP stream
+  const renderRtmpStream = () => {
+    if (!flvjs.isSupported()) {
+      return (
+        <div className="relative w-full h-full flex flex-col items-center justify-center bg-slate-950">
+          <WifiOff className="w-12 h-12 text-red-400 mb-4" />
+          <p className="text-red-400 text-sm">FLV playback not supported in this browser</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="relative w-full h-full">
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-contain bg-black"
+          autoPlay
+          playsInline
+          muted={isMuted}
+        />
+
+        {/* Connection status overlay */}
+        {streamError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 z-10">
+            <WifiOff className="w-12 h-12 text-red-400 mb-4" />
+            <p className="text-red-400 text-sm mb-4">{streamError}</p>
+            <button
+              onClick={initFlvPlayer}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" /> Retry
+            </button>
+          </div>
+        )}
+
+        {/* Connecting indicator */}
+        {!isConnected && !streamError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10">
+            <RefreshCw className="w-8 h-8 text-amber-400 animate-spin mb-4" />
+            <p className="text-amber-400 text-sm">Connecting to stream...</p>
+          </div>
+        )}
+
+        {/* Live badge and stats */}
+        {isConnected && (
+          <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+            {stats.bitrate > 0 && (
+              <span className="px-2 py-1 bg-black/60 rounded text-xs text-white font-mono">
+                {stats.bitrate} kbps
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className="relative w-full aspect-video bg-black rounded-none lg:rounded-xl overflow-hidden shadow-2xl group border-y lg:border border-slate-800"
@@ -111,6 +261,8 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
             allowFullScreen
             className="w-full h-full object-cover"
           ></iframe>
+        ) : source === StreamSource.CUSTOM_RTMP && streamKey ? (
+          renderRtmpStream()
         ) : (
           <div className="relative w-full h-full flex flex-col items-center justify-center bg-slate-950 overflow-hidden">
             {/* Demo video for testing volume controls */}
@@ -157,7 +309,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ source, youtubeVideoId
           </span>
         )}
         <span className="bg-black/50 backdrop-blur-md text-white/80 text-xs px-2 py-1 rounded border border-white/10 font-mono">
-          {source === StreamSource.YOUTUBE ? 'YT' : 'RTMP'}
+          {source === StreamSource.YOUTUBE ? 'YT' : source === StreamSource.CUSTOM_RTMP ? 'RTMP' : 'HLS'}
         </span>
       </div>
 

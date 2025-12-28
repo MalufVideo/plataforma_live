@@ -30,18 +30,42 @@ import { startRtmpServer } from './services/rtmpServer.js';
 
 dotenv.config();
 
+// Allowed CORS origins
+const ALLOWED_ORIGINS = [
+    'https://www.livevideo.com.br',
+    'https://livevideo.com.br',
+    'https://plataforma-live-frontend.vercel.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+];
+
+const corsOptions = {
+    origin: (origin, callback) => {
+        // Normalize origin by removing trailing slash
+        const normalizedOrigin = origin ? origin.replace(/\/$/, '') : null;
+        // Allow requests with no origin (mobile apps, curl, etc.)
+        if (!normalizedOrigin) return callback(null, true);
+        if (ALLOWED_ORIGINS.includes(normalizedOrigin)) {
+            callback(null, true);
+        } else {
+            console.log('[CORS] Blocked origin:', origin);
+            callback(null, true); // Allow anyway for now, log for debugging
+        }
+    },
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true
+};
+
+
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
-    cors: {
-        origin: process.env.CORS_ORIGIN || '*',
-        methods: ['GET', 'POST']
-    }
+    cors: corsOptions
 });
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Rate Limiting

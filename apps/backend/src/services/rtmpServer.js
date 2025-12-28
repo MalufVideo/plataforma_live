@@ -13,9 +13,16 @@ let corsProxyServer = null;
 const ALLOWED_ORIGINS = [
     'https://www.livevideo.com.br',
     'https://livevideo.com.br',
+    'https://plataforma-live-frontend.vercel.app',
     'http://localhost:5173',
     'http://localhost:3000'
 ];
+
+// Normalize origin by removing trailing slash
+function normalizeOrigin(origin) {
+    return origin ? origin.replace(/\/$/, '') : null;
+}
+
 
 // Check if ffmpeg exists before enabling transcoding
 const ffmpegPath = process.env.FFMPEG_PATH || '/usr/bin/ffmpeg';
@@ -142,7 +149,8 @@ function notifyStreamStatus(projectId, status, streamKey) {
  */
 function createCorsProxy() {
     const proxy = http.createServer((req, res) => {
-        const origin = req.headers.origin;
+        // Normalize origin by removing trailing slash
+        const origin = normalizeOrigin(req.headers.origin);
 
         // Handle CORS preflight
         if (req.method === 'OPTIONS') {
@@ -161,6 +169,7 @@ function createCorsProxy() {
 
         // Proxy request to internal NMS server
         const options = {
+
             hostname: 'localhost',
             port: NMS_INTERNAL_HTTP_PORT,
             path: req.url,
