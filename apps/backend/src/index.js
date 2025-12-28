@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'http';
+import http from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
@@ -69,6 +70,37 @@ app.use('/api/rooms', roomRoutes);
 app.use('/api/surveys', surveyRoutes);
 app.use('/api/rtmp', rtmpRoutes);
 app.use('/api/transcoding', transcodingRoutes);
+
+// FLV Proxy - streams from /flv/* to internal Node Media Server
+const FLV_INTERNAL_PORT = 8002;
+app.use('/flv', (req, res) => {
+    const options = {
+        hostname: 'localhost',
+        port: FLV_INTERNAL_PORT,
+        path: req.url,
+        method: req.method,
+        headers: {
+            ...req.headers,
+            host: `localhost:${FLV_INTERNAL_PORT}`
+        }
+    };
+
+    const proxyReq = http.request(options, (proxyRes) => {
+        // Copy headers from NMS response
+        Object.keys(proxyRes.headers).forEach(key => {
+            res.setHeader(key, proxyRes.headers[key]);
+        });
+        res.writeHead(proxyRes.statusCode);
+        proxyRes.pipe(res);
+    });
+
+    proxyReq.on('error', (err) => {
+        console.error('[FLV Proxy] Error:', err.message);
+        res.status(502).json({ error: 'Stream unavailable' });
+    });
+
+    req.pipe(proxyReq);
+});
 
 // WebSocket Setup
 setupSocketHandlers(io);

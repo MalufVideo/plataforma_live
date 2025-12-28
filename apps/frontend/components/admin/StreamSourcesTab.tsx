@@ -19,8 +19,8 @@ interface StreamSourcesTabProps {
   onProjectUpdate?: (project: Project) => void;
 }
 
-// Server URLs
-const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://flv.livevideo.com.br';
+// Server URLs - FLV streams through main API domain
+const FLV_SERVER_URL = import.meta.env.VITE_FLV_SERVER_URL || 'https://api.livevideo.com.br/flv';
 
 export const StreamSourcesTab: React.FC<StreamSourcesTabProps> = ({
   currentSource,
