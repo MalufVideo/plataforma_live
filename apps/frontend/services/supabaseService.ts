@@ -149,7 +149,10 @@ export const onAuthStateChange = (callback: (user: User | null) => void) => {
 };
 
 export const signInWithGoogle = async (redirectPath?: string) => {
-  const redirectTo = `${window.location.origin}${redirectPath || '/'}`;
+  // Use production URL in production, or current origin for local dev
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const baseUrl = isLocalhost ? window.location.origin : 'https://livevideo.com.br';
+  const redirectTo = `${baseUrl}${redirectPath || '/'}`;
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
@@ -985,8 +988,14 @@ export const goLive = async (projectId: string): Promise<Project> => {
 // =============================================
 
 export const resetPasswordForEmail = async (email: string) => {
+  // Use production URL in production, or current origin for local dev
+  const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  const redirectUrl = isLocalhost
+    ? `${window.location.origin}/reset-password`
+    : 'https://livevideo.com.br/reset-password';
+
   const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/reset-password`
+    redirectTo: redirectUrl
   });
 
   if (error) throw error;
