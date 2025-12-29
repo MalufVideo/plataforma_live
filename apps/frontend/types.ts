@@ -25,6 +25,7 @@ export type Language = 'pt' | 'en';
 export interface User {
   id: string;
   name: string;
+  username?: string; // Unique handle for public profile URL (e.g., livevideo.com.br/username)
   role: UserRole;
   avatar: string;
   company?: string;

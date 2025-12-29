@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { Play, Loader2, Mail } from 'lucide-react';
-import { signInWithGoogle, signIn, signUp } from '../services/supabaseService';
+import { Play, Loader2, Mail, ArrowLeft } from 'lucide-react';
+import { signInWithGoogle, signIn, signUp, checkUsernameAvailable, resetPasswordForEmail } from '../services/supabaseService';
 
 interface LoginPageProps {
   lang: Language;
   setLang: (l: Language) => void;
 }
 
-type AuthAction = 'signin' | 'signup';
+type AuthAction = 'signin' | 'signup' | 'reset';
 
 export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
   const t = TRANSLATIONS[lang].login;
@@ -22,6 +22,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
+  const [usernameAvailable, setUsernameAvailable] = useState<boolean | null>(null);
+  const [checkingUsername, setCheckingUsername] = useState(false);
 
   const handleGoogleLogin = async () => {
     try {
@@ -39,7 +42,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
     setError(null);
     setSuccess(null);
 
-    // Validation
+    // Validation for password reset
+    if (authAction === 'reset') {
+      if (!email.trim()) {
+        setError(t.emailRequired);
+        return;
+      }
+      try {
+        setLoading('email');
+        await resetPasswordForEmail(email);
+        setSuccess(t.resetEmailSent);
+        setLoading(null);
+        // Switch back to signin after 3 seconds
+        setTimeout(() => {
+          setAuthAction('signin');
+          setSuccess(null);
+        }, 3000);
+      } catch (err: any) {
+        setError(err.message || 'Failed to send reset email');
+        setLoading(null);
+      }
+      return;
+    }
+
+    // Validation for signin/signup
     if (!email.trim()) {
       setError(t.emailRequired);
       return;
@@ -53,11 +79,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
       return;
     }
 
+    if (authAction === 'signup' && username) {
+      // Validate username format
+      const usernameRegex = /^[a-zA-Z0-9_-]+$/;
+      if (!usernameRegex.test(username)) {
+        setError(t.usernameInvalid || 'Username can only contain letters, numbers, underscores and hyphens');
+        return;
+      }
+      if (username.length < 3) {
+        setError(t.usernameTooShort || 'Username must be at least 3 characters');
+        return;
+      }
+      // Check availability one more time
+      const available = await checkUsernameAvailable(username);
+      if (!available) {
+        setError(t.usernameTaken || 'This username is already taken');
+        return;
+      }
+    }
+
     try {
       setLoading('email');
 
       if (authAction === 'signup') {
-        await signUp(email, password, name || email.split('@')[0]);
+        await signUp(email, password, name || email.split('@')[0], username?.toLowerCase());
         setSuccess(t.signUpSuccess);
         setLoading(null);
       } else {
@@ -106,12 +151,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
         {/* Login Card */}
         <div className="w-full bg-slate-900/50 border border-slate-800 rounded-2xl p-8 backdrop-blur-sm">
           <h2 className="text-2xl font-bold text-white mb-2 text-center">
-            {authAction === 'signin' ? t.signIn : t.signUp}
+            {authAction === 'signin' ? t.signIn : authAction === 'signup' ? t.signUp : t.resetPassword}
           </h2>
           <p className="text-slate-400 mb-6 text-center text-sm">
             {authAction === 'signin'
               ? (lang === 'pt' ? 'Entre na sua conta' : 'Sign in to your account')
-              : (lang === 'pt' ? 'Crie sua conta para começar' : 'Create your account to get started')
+              : authAction === 'signup'
+              ? (lang === 'pt' ? 'Crie sua conta para começar' : 'Create your account to get started')
+              : t.enterEmailForReset
             }
           </p>
 
@@ -128,17 +175,67 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
           )}
 
           <form onSubmit={handleEmailAuth} className="space-y-4">
-            {authAction === 'signup' && (
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">{t.name}</label>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                  placeholder={lang === 'pt' ? 'Seu nome' : 'Your name'}
-                />
-              </div>
+            {authAction === 'signup' && authAction !== 'reset' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">{t.name}</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                    placeholder={lang === 'pt' ? 'Seu nome' : 'Your name'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                    {t.username || 'Username'}
+                    <span className="text-slate-500 text-xs ml-2">(livevideo.com.br/username)</span>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={async (e) => {
+                        const value = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                        setUsername(value);
+                        setUsernameAvailable(null);
+                        if (value.length >= 3) {
+                          setCheckingUsername(true);
+                          try {
+                            const available = await checkUsernameAvailable(value);
+                            setUsernameAvailable(available);
+                          } catch {
+                            setUsernameAvailable(null);
+                          } finally {
+                            setCheckingUsername(false);
+                          }
+                        }
+                      }}
+                      className={`w-full px-4 py-3 bg-slate-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-1 transition-colors ${
+                        usernameAvailable === true ? 'border-green-500 focus:border-green-500 focus:ring-green-500' :
+                        usernameAvailable === false ? 'border-red-500 focus:border-red-500 focus:ring-red-500' :
+                        'border-slate-700 focus:border-indigo-500 focus:ring-indigo-500'
+                      }`}
+                      placeholder={lang === 'pt' ? 'seu-usuario' : 'your-username'}
+                    />
+                    {checkingUsername && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-indigo-500"></div>
+                      </div>
+                    )}
+                    {!checkingUsername && usernameAvailable === true && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500">✓</div>
+                    )}
+                    {!checkingUsername && usernameAvailable === false && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-red-500">✗</div>
+                    )}
+                  </div>
+                  {usernameAvailable === false && (
+                    <p className="text-red-400 text-xs mt-1">{t.usernameTaken || 'This username is already taken'}</p>
+                  )}
+                </div>
+              </>
             )}
 
             <div>
@@ -153,17 +250,36 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">{t.password}</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
-                placeholder="••••••••"
-                autoComplete={authAction === 'signin' ? 'current-password' : 'new-password'}
-              />
-            </div>
+            {authAction !== 'reset' && (
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">{t.password}</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-colors"
+                  placeholder="••••••••"
+                  autoComplete={authAction === 'signin' ? 'current-password' : 'new-password'}
+                />
+              </div>
+            )}
+
+            {/* Forgot Password Link */}
+            {authAction === 'signin' && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthAction('reset');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors"
+                >
+                  {t.forgotPassword}
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"
@@ -172,48 +288,70 @@ export const LoginPage: React.FC<LoginPageProps> = ({ lang, setLang }) => {
             >
               {loading === 'email' ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
+              ) : authAction === 'reset' ? (
+                <Mail className="w-5 h-5" />
               ) : (
                 <Mail className="w-5 h-5" />
               )}
-              {authAction === 'signin' ? t.signIn : t.signUp}
+              {authAction === 'signin' ? t.signIn : authAction === 'signup' ? t.signUp : t.sendResetLink}
             </button>
           </form>
 
-          {/* Divider */}
-          <div className="relative my-6">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-slate-700"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-slate-900/50 text-slate-500">{t.orContinueWith}</span>
-            </div>
-          </div>
-
-          {/* Google button */}
-          <button
-            onClick={handleGoogleLogin}
-            disabled={loading !== null}
-            className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-          >
-            {loading === 'google' ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
-            Google
-          </button>
-
-          {/* Toggle signin/signup */}
-          <p className="mt-6 text-center text-slate-400 text-sm">
-            {authAction === 'signin' ? t.noAccount : t.hasAccount}{' '}
+          {/* Back to Login for Reset Password */}
+          {authAction === 'reset' && (
             <button
               type="button"
               onClick={() => {
-                setAuthAction(authAction === 'signin' ? 'signup' : 'signin');
+                setAuthAction('signin');
                 setError(null);
                 setSuccess(null);
               }}
-              className="text-indigo-400 hover:text-indigo-300 font-medium"
+              className="w-full mt-4 py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
             >
-              {authAction === 'signin' ? t.createAccount : t.loginHere}
+              <ArrowLeft className="w-5 h-5" />
+              {t.backToLogin}
             </button>
-          </p>
+          )}
+
+          {/* Divider - Hide for Reset Password */}
+          {authAction !== 'reset' && (
+            <>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-slate-700"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-slate-900/50 text-slate-500">{t.orContinueWith}</span>
+                </div>
+              </div>
+
+              {/* Google button */}
+              <button
+                onClick={handleGoogleLogin}
+                disabled={loading !== null}
+                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white hover:bg-gray-100 text-gray-900 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+              >
+                {loading === 'google' ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
+                Google
+              </button>
+
+              {/* Toggle signin/signup */}
+              <p className="mt-6 text-center text-slate-400 text-sm">
+                {authAction === 'signin' ? t.noAccount : t.hasAccount}{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthAction(authAction === 'signin' ? 'signup' : 'signin');
+                    setError(null);
+                    setSuccess(null);
+                  }}
+                  className="text-indigo-400 hover:text-indigo-300 font-medium"
+                >
+                  {authAction === 'signin' ? t.createAccount : t.loginHere}
+                </button>
+              </p>
+            </>
+          )}
         </div>
       </div>
 

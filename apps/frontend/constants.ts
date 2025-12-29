@@ -26,7 +26,21 @@ export const TRANSLATIONS = {
       emailRequired: 'Email é obrigatório',
       passwordRequired: 'Senha é obrigatória',
       passwordMinLength: 'Senha deve ter pelo menos 6 caracteres',
-      signUpSuccess: 'Conta criada! Verifique seu email para confirmar.'
+      signUpSuccess: 'Conta criada! Verifique seu email para confirmar.',
+      username: 'Nome de usuário',
+      usernameTaken: 'Este nome de usuário já está em uso',
+      usernameInvalid: 'Nome de usuário pode conter apenas letras, números, underscores e hífens',
+      usernameTooShort: 'Nome de usuário deve ter pelo menos 3 caracteres',
+      forgotPassword: 'Esqueceu a senha?',
+      resetPassword: 'Redefinir Senha',
+      sendResetLink: 'Enviar Link de Redefinição',
+      backToLogin: 'Voltar ao Login',
+      resetEmailSent: 'Email de redefinição enviado! Verifique sua caixa de entrada.',
+      newPassword: 'Nova Senha',
+      confirmPassword: 'Confirmar Senha',
+      passwordsDoNotMatch: 'As senhas não coincidem',
+      passwordResetSuccess: 'Senha redefinida com sucesso! Faça login.',
+      enterEmailForReset: 'Digite seu email para receber o link de redefinição'
     },
     nav: {
       stage: 'Palco Principal',
@@ -171,7 +185,21 @@ export const TRANSLATIONS = {
       emailRequired: 'Email is required',
       passwordRequired: 'Password is required',
       passwordMinLength: 'Password must be at least 6 characters',
-      signUpSuccess: 'Account created! Check your email to confirm.'
+      signUpSuccess: 'Account created! Check your email to confirm.',
+      username: 'Username',
+      usernameTaken: 'This username is already taken',
+      usernameInvalid: 'Username can only contain letters, numbers, underscores and hyphens',
+      usernameTooShort: 'Username must be at least 3 characters',
+      forgotPassword: 'Forgot password?',
+      resetPassword: 'Reset Password',
+      sendResetLink: 'Send Reset Link',
+      backToLogin: 'Back to Login',
+      resetEmailSent: 'Reset email sent! Check your inbox.',
+      newPassword: 'New Password',
+      confirmPassword: 'Confirm Password',
+      passwordsDoNotMatch: 'Passwords do not match',
+      passwordResetSuccess: 'Password reset successfully! Please login.',
+      enterEmailForReset: 'Enter your email to receive reset link'
     },
     nav: {
       stage: 'Main Stage',
@@ -328,11 +356,14 @@ export const MOCK_PROJECTS: Project[] = [
     description: 'Testing live streaming functionality with YouTube video source.',
     status: 'LIVE',
     isOnDemand: false,
+    isPublic: true,
     createdAt: Date.now() - 86400000,
     startedAt: Date.now() - 3600000,
     youtubeVideoId: 'cu4xksmv7ho',
     thumbnail: 'https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=800&q=80',
-    viewers: 12450
+    viewers: 12450,
+    rtmpStreamKey: 'mock-stream-key-1',
+    ownerId: 'mock-owner-1'
   },
   {
     id: 'proj-2',
@@ -340,12 +371,15 @@ export const MOCK_PROJECTS: Project[] = [
     description: 'Annual technology conference with keynotes and workshops.',
     status: 'ENDED',
     isOnDemand: true,
+    isPublic: true,
     createdAt: Date.now() - 604800000,
     startedAt: Date.now() - 604800000 + 3600000,
     endedAt: Date.now() - 604800000 + 10800000,
     youtubeVideoId: 'dQw4w9WgXcQ',
     thumbnail: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80',
-    viewers: 8500
+    viewers: 8500,
+    rtmpStreamKey: 'mock-stream-key-2',
+    ownerId: 'mock-owner-1'
   },
   {
     id: 'proj-3',
@@ -353,12 +387,15 @@ export const MOCK_PROJECTS: Project[] = [
     description: 'New product reveal and demo session.',
     status: 'ENDED',
     isOnDemand: false,
+    isPublic: true,
     createdAt: Date.now() - 1209600000,
     startedAt: Date.now() - 1209600000 + 7200000,
     endedAt: Date.now() - 1209600000 + 14400000,
     youtubeVideoId: 'jNQXAC9IVRw',
     thumbnail: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?w=800&q=80',
-    viewers: 5200
+    viewers: 5200,
+    rtmpStreamKey: 'mock-stream-key-3',
+    ownerId: 'mock-owner-1'
   },
   {
     id: 'proj-4',
@@ -366,9 +403,12 @@ export const MOCK_PROJECTS: Project[] = [
     description: 'Draft event for future webinar.',
     status: 'DRAFT',
     isOnDemand: false,
+    isPublic: false,
     createdAt: Date.now() - 172800000,
     thumbnail: 'https://images.unsplash.com/photo-1591115765373-5207764f72e7?w=800&q=80',
-    viewers: 0
+    viewers: 0,
+    rtmpStreamKey: 'mock-stream-key-4',
+    ownerId: 'mock-owner-1'
   }
 ];
 

@@ -10,17 +10,73 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 // AUTH FUNCTIONS
 // =============================================
 
-export const signUp = async (email: string, password: string, name: string, company?: string, title?: string) => {
+export const signUp = async (email: string, password: string, name: string, username?: string, company?: string, title?: string) => {
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      data: { name, company, title }
+      data: { name, username, company, title }
     }
   });
 
   if (error) throw error;
   return data;
+};
+
+// Check if username is available
+export const checkUsernameAvailable = async (username: string): Promise<boolean> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('username')
+    .eq('username', username.toLowerCase())
+    .maybeSingle();
+
+  if (error) throw error;
+  return !data;
+};
+
+// Get profile by username (for public channel page)
+export const getProfileByUsername = async (username: string) => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('username', username.toLowerCase())
+    .single();
+
+  if (error) {
+    if (error.code === 'PGRST116') return null;
+    throw error;
+  }
+  return data;
+};
+
+// Get public projects for a user (for public channel page)
+export const getPublicProjectsByUserId = async (userId: string): Promise<Project[]> => {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('owner_id', userId)
+    .eq('is_public', true)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    status: p.status,
+    isOnDemand: p.is_on_demand,
+    isPublic: p.is_public ?? true,
+    createdAt: new Date(p.created_at).getTime(),
+    startedAt: p.started_at ? new Date(p.started_at).getTime() : undefined,
+    endedAt: p.ended_at ? new Date(p.ended_at).getTime() : undefined,
+    youtubeVideoId: p.youtube_video_id,
+    thumbnail: p.thumbnail,
+    viewers: p.viewers,
+    rtmpStreamKey: p.rtmp_stream_key,
+    ownerId: p.owner_id
+  }));
 };
 
 export const signIn = async (email: string, password: string) => {
@@ -72,6 +128,7 @@ export const getCurrentUser = async (): Promise<AppUser | null> => {
   return {
     id: profile.id,
     name: profile.name,
+    username: profile.username,
     role: profile.role as UserRole,
     avatar: profile.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.name}`,
     company: profile.company,
@@ -126,6 +183,7 @@ export const getProfile = async (userId: string) => {
 
 export const updateProfile = async (userId: string, updates: Partial<{
   name: string;
+  username: string;
   avatar: string;
   company: string;
   title: string;
@@ -920,4 +978,26 @@ export const goLive = async (projectId: string): Promise<Project> => {
     status: 'LIVE',
     startedAt: Date.now()
   });
+};
+
+// =============================================
+// PASSWORD RESET FUNCTIONS
+// =============================================
+
+export const resetPasswordForEmail = async (email: string) => {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`
+  });
+
+  if (error) throw error;
+  return data;
+};
+
+export const updatePassword = async (newPassword: string) => {
+  const { data, error } = await supabase.auth.updateUser({
+    password: newPassword
+  });
+
+  if (error) throw error;
+  return data;
 };

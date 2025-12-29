@@ -3,6 +3,7 @@ CREATE TABLE profiles (
   id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
   email TEXT,
   name TEXT,
+  username TEXT UNIQUE, -- Unique handle for public profile URL (e.g., livevideo.com.br/username)
   role TEXT DEFAULT 'ATTENDEE', -- ATTENDEE, SPEAKER, MODERATOR, ADMIN
   avatar TEXT,
   company TEXT,
@@ -223,8 +224,8 @@ INSERT INTO transcoding_profiles (name, width, height, video_bitrate, audio_bitr
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, name, role)
-  VALUES (new.id, new.email, new.raw_user_meta_data->>'name', 'ATTENDEE');
+  INSERT INTO public.profiles (id, email, name, username, role)
+  VALUES (new.id, new.email, new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'username', 'ATTENDEE');
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -304,6 +305,7 @@ CREATE INDEX idx_messages_session ON messages(session_id, created_at);
 CREATE INDEX idx_questions_session ON questions(session_id, upvotes DESC);
 CREATE INDEX idx_events_status ON events(status);
 CREATE INDEX idx_profiles_role ON profiles(role);
+CREATE UNIQUE INDEX idx_profiles_username ON profiles(username) WHERE username IS NOT NULL;
 CREATE INDEX idx_rtmp_stream_key ON rtmp_ingest_configs(stream_key);
 CREATE INDEX idx_transcoding_jobs_stream ON transcoding_jobs(stream_id, status);
 CREATE INDEX idx_transcoding_jobs_status ON transcoding_jobs(status);

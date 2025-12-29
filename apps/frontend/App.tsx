@@ -6,6 +6,9 @@ import { AdminConsole } from './pages/AdminConsole';
 import { MasterAdminDashboard } from './pages/MasterAdminDashboard';
 import { BreakoutRooms } from './pages/BreakoutRooms';
 import { LoginPage } from './pages/LoginPage';
+import { ChannelPage } from './pages/ChannelPage';
+import { PublicViewer } from './pages/PublicViewer';
+import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
 import { MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
@@ -34,6 +37,73 @@ const App: React.FC = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [projectsLoading, setProjectsLoading] = useState(true);
+
+  // Routing State (for public channel/project pages)
+  const [routeType, setRouteType] = useState<'app' | 'channel' | 'watch' | 'reset-password'>('app');
+  const [routeUsername, setRouteUsername] = useState<string | null>(null);
+  const [routeProjectId, setRouteProjectId] = useState<string | null>(null);
+
+  // Parse URL on mount and handle routing
+  useEffect(() => {
+    const parseRoute = () => {
+      const path = window.location.pathname;
+      const searchParams = new URLSearchParams(window.location.search);
+
+      // Check for /reset-password pattern
+      if (path === '/reset-password') {
+        setRouteType('reset-password');
+        return;
+      }
+
+      // Check for /watch?id=projectId pattern
+      if (path === '/watch' && searchParams.get('id')) {
+        setRouteType('watch');
+        setRouteProjectId(searchParams.get('id'));
+        return;
+      }
+
+      // Check for /{username} pattern (not reserved paths)
+      const reservedPaths = ['/', '/login', '/admin', '/watch', '/reset-password'];
+      if (path.length > 1 && !reservedPaths.includes(path)) {
+        const username = path.slice(1).split('/')[0]; // Get first segment after /
+        if (username && /^[a-zA-Z0-9_-]+$/.test(username)) {
+          setRouteType('channel');
+          setRouteUsername(username.toLowerCase());
+          return;
+        }
+      }
+
+      setRouteType('app');
+    };
+
+    parseRoute();
+
+    // Listen for popstate (back/forward navigation)
+    window.addEventListener('popstate', parseRoute);
+    return () => window.removeEventListener('popstate', parseRoute);
+  }, []);
+
+  // Navigate to channel page
+  const navigateToChannel = (username: string) => {
+    window.history.pushState({}, '', `/${username}`);
+    setRouteType('channel');
+    setRouteUsername(username);
+  };
+
+  // Navigate to watch page
+  const navigateToWatch = (projectId: string) => {
+    window.history.pushState({}, '', `/watch?id=${projectId}`);
+    setRouteType('watch');
+    setRouteProjectId(projectId);
+  };
+
+  // Navigate back to app
+  const navigateToApp = () => {
+    window.history.pushState({}, '', '/');
+    setRouteType('app');
+    setRouteUsername(null);
+    setRouteProjectId(null);
+  };
 
   // Load projects when user is authenticated
   useEffect(() => {
@@ -223,6 +293,32 @@ const App: React.FC = () => {
   };
 
   const t = TRANSLATIONS[lang].stage;
+
+  // Handle public routes first (no auth required)
+  if (routeType === 'reset-password') {
+    return (
+      <ResetPasswordPage
+        lang={lang}
+        setLang={setLang}
+        onResetComplete={navigateToApp}
+      />
+    );
+  }
+
+  if (routeType === 'channel' && routeUsername) {
+    return (
+      <ChannelPage
+        username={routeUsername}
+        lang={lang}
+        onSelectProject={navigateToWatch}
+        onBack={navigateToApp}
+      />
+    );
+  }
+
+  if (routeType === 'watch' && routeProjectId) {
+    return <PublicViewer projectId={routeProjectId} />;
+  }
 
   // Show loading state while checking auth
   if (authLoading) {
