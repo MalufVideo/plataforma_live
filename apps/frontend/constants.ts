@@ -45,6 +45,7 @@ export const TRANSLATIONS = {
     nav: {
       stage: 'Palco Principal',
       rooms: 'Salas',
+      parties: 'Minhas Festas',
       agenda: 'Agenda',
       networking: 'Networking',
       admin: 'Controle',
@@ -204,6 +205,7 @@ export const TRANSLATIONS = {
     nav: {
       stage: 'Main Stage',
       rooms: 'Breakout Rooms',
+      parties: 'My Parties',
       agenda: 'Agenda',
       networking: 'Networking',
       admin: 'Control Room',

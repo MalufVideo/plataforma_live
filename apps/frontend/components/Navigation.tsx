@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Radio, Calendar, Users, Settings, BarChart3, LogOut, Grid, Globe, Play } from 'lucide-react';
+import { LayoutDashboard, Radio, Calendar, Users, Settings, BarChart3, LogOut, Grid, Globe, Play, PartyPopper } from 'lucide-react';
 import { Language } from '../types';
 import { TRANSLATIONS } from '../constants';
 
@@ -17,6 +17,7 @@ export const Navigation: React.FC<NavigationProps> = ({ activeTab, setActiveTab,
   const navItems = [
     { id: 'stage', label: t.stage, icon: Radio },
     { id: 'rooms', label: t.rooms, icon: Grid },
+    { id: 'parties', label: t.parties, icon: PartyPopper },
     { id: 'agenda', label: t.agenda, icon: Calendar },
     { id: 'networking', label: t.networking, icon: Users },
   ];

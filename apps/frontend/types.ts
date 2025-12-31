@@ -144,3 +144,33 @@ export interface Project {
   rtmpStreamKey: string; // Unique RTMP stream key for this project
   ownerId: string; // User ID of the project owner (ADMIN)
 }
+
+export type PartyStatus = 'DRAFT' | 'PUBLISHED' | 'CANCELLED' | 'COMPLETED';
+export type InvitationStatus = 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED';
+
+export interface Party {
+  id: string;
+  hostId: string;
+  title: string;
+  description?: string;
+  partyDate?: number;
+  location?: string;
+  maxGuests?: number;
+  status: PartyStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface PartyInvitation {
+  id: string;
+  partyId: string;
+  guestEmail: string;
+  guestName?: string;
+  guestUserId?: string;
+  invitationStatus: InvitationStatus;
+  invitedAt: number;
+  respondedAt?: number;
+  attended: boolean;
+  notes?: string;
+  reminderSentAt?: number;
+}

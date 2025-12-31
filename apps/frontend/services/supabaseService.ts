@@ -1010,3 +1010,273 @@ export const updatePassword = async (newPassword: string) => {
   if (error) throw error;
   return data;
 };
+
+// =============================================
+// PARTY MANAGEMENT FUNCTIONS
+// =============================================
+
+export const getMyParties = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('parties')
+    .select('*')
+    .eq('host_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((p: any) => ({
+    id: p.id,
+    hostId: p.host_id,
+    title: p.title,
+    description: p.description,
+    partyDate: p.party_date ? new Date(p.party_date).getTime() : undefined,
+    location: p.location,
+    maxGuests: p.max_guests,
+    status: p.status,
+    createdAt: new Date(p.created_at).getTime(),
+    updatedAt: new Date(p.updated_at).getTime()
+  }));
+};
+
+export const getParty = async (partyId: string) => {
+  const { data, error } = await supabase
+    .from('parties')
+    .select('*')
+    .eq('id', partyId)
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    hostId: data.host_id,
+    title: data.title,
+    description: data.description,
+    partyDate: data.party_date ? new Date(data.party_date).getTime() : undefined,
+    location: data.location,
+    maxGuests: data.max_guests,
+    status: data.status,
+    createdAt: new Date(data.created_at).getTime(),
+    updatedAt: new Date(data.updated_at).getTime()
+  };
+};
+
+export const createParty = async (party: Omit<any, 'id' | 'hostId' | 'createdAt' | 'updatedAt'>) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('parties')
+    .insert({
+      host_id: user.id,
+      title: party.title,
+      description: party.description,
+      party_date: party.partyDate ? new Date(party.partyDate).toISOString() : null,
+      location: party.location,
+      max_guests: party.maxGuests,
+      status: party.status || 'DRAFT'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    hostId: data.host_id,
+    title: data.title,
+    description: data.description,
+    partyDate: data.party_date ? new Date(data.party_date).getTime() : undefined,
+    location: data.location,
+    maxGuests: data.max_guests,
+    status: data.status,
+    createdAt: new Date(data.created_at).getTime(),
+    updatedAt: new Date(data.updated_at).getTime()
+  };
+};
+
+export const updateParty = async (partyId: string, updates: Partial<any>) => {
+  const dbUpdates: any = {};
+
+  if (updates.title !== undefined) dbUpdates.title = updates.title;
+  if (updates.description !== undefined) dbUpdates.description = updates.description;
+  if (updates.partyDate !== undefined) dbUpdates.party_date = updates.partyDate ? new Date(updates.partyDate).toISOString() : null;
+  if (updates.location !== undefined) dbUpdates.location = updates.location;
+  if (updates.maxGuests !== undefined) dbUpdates.max_guests = updates.maxGuests;
+  if (updates.status !== undefined) dbUpdates.status = updates.status;
+
+  const { data, error } = await supabase
+    .from('parties')
+    .update(dbUpdates)
+    .eq('id', partyId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    hostId: data.host_id,
+    title: data.title,
+    description: data.description,
+    partyDate: data.party_date ? new Date(data.party_date).getTime() : undefined,
+    location: data.location,
+    maxGuests: data.max_guests,
+    status: data.status,
+    createdAt: new Date(data.created_at).getTime(),
+    updatedAt: new Date(data.updated_at).getTime()
+  };
+};
+
+export const deleteParty = async (partyId: string) => {
+  const { error } = await supabase
+    .from('parties')
+    .delete()
+    .eq('id', partyId);
+
+  if (error) throw error;
+};
+
+// =============================================
+// PARTY INVITATION FUNCTIONS
+// =============================================
+
+export const getPartyInvitations = async (partyId: string) => {
+  const { data, error } = await supabase
+    .from('party_invitations')
+    .select('*')
+    .eq('party_id', partyId)
+    .order('invited_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((inv: any) => ({
+    id: inv.id,
+    partyId: inv.party_id,
+    guestEmail: inv.guest_email,
+    guestName: inv.guest_name,
+    guestUserId: inv.guest_user_id,
+    invitationStatus: inv.invitation_status,
+    invitedAt: new Date(inv.invited_at).getTime(),
+    respondedAt: inv.responded_at ? new Date(inv.responded_at).getTime() : undefined,
+    attended: inv.attended,
+    notes: inv.notes,
+    reminderSentAt: inv.reminder_sent_at ? new Date(inv.reminder_sent_at).getTime() : undefined
+  }));
+};
+
+export const inviteGuest = async (partyId: string, guestEmail: string, guestName?: string) => {
+  const { data, error } = await supabase
+    .from('party_invitations')
+    .insert({
+      party_id: partyId,
+      guest_email: guestEmail,
+      guest_name: guestName,
+      invitation_status: 'PENDING'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    partyId: data.party_id,
+    guestEmail: data.guest_email,
+    guestName: data.guest_name,
+    guestUserId: data.guest_user_id,
+    invitationStatus: data.invitation_status,
+    invitedAt: new Date(data.invited_at).getTime(),
+    respondedAt: data.responded_at ? new Date(data.responded_at).getTime() : undefined,
+    attended: data.attended,
+    notes: data.notes,
+    reminderSentAt: data.reminder_sent_at ? new Date(data.reminder_sent_at).getTime() : undefined
+  };
+};
+
+export const bulkInviteGuests = async (partyId: string, guests: { email: string; name?: string }[]) => {
+  const invitations = guests.map(g => ({
+    party_id: partyId,
+    guest_email: g.email,
+    guest_name: g.name,
+    invitation_status: 'PENDING'
+  }));
+
+  const { data, error } = await supabase
+    .from('party_invitations')
+    .insert(invitations)
+    .select();
+
+  if (error) throw error;
+
+  return data;
+};
+
+export const updateInvitationStatus = async (invitationId: string, status: string) => {
+  const { data, error } = await supabase
+    .from('party_invitations')
+    .update({
+      invitation_status: status,
+      responded_at: new Date().toISOString()
+    })
+    .eq('id', invitationId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+};
+
+export const deleteInvitation = async (invitationId: string) => {
+  const { error } = await supabase
+    .from('party_invitations')
+    .delete()
+    .eq('id', invitationId);
+
+  if (error) throw error;
+};
+
+export const sendReminderToGuest = async (invitationId: string) => {
+  const { data, error } = await supabase
+    .from('party_invitations')
+    .update({
+      reminder_sent_at: new Date().toISOString()
+    })
+    .eq('id', invitationId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return data;
+};
+
+export const getMyInvitations = async () => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('id', user.id)
+    .single();
+
+  if (!profile) throw new Error('Profile not found');
+
+  const { data, error } = await supabase
+    .from('party_invitations')
+    .select(`
+      *,
+      parties (*)
+    `)
+    .or(`guest_email.eq.${profile.email},guest_user_id.eq.${user.id}`)
+    .order('invited_at', { ascending: false });
+
+  if (error) throw error;
+
+  return data;
+};

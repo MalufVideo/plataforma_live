@@ -9,6 +9,7 @@ import { LoginPage } from './pages/LoginPage';
 import { ChannelPage } from './pages/ChannelPage';
 import { PublicViewer } from './pages/PublicViewer';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
+import { PartyManagementPage } from './pages/PartyManagementPage';
 import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
 import { MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
@@ -378,6 +379,8 @@ const App: React.FC = () => {
       <main className="flex-1 flex flex-col relative overflow-hidden mb-16 md:mb-0">
         {activeTab === 'rooms' ? (
           <BreakoutRooms onJoinRoom={handleJoinRoom} lang={lang} />
+        ) : activeTab === 'parties' ? (
+          <PartyManagementPage />
         ) : (
           <div className="flex flex-1 overflow-hidden flex-col lg:flex-row relative">
             <div className="flex-1 flex flex-col overflow-y-auto bg-black custom-scrollbar">
