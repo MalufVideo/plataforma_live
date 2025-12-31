@@ -34,10 +34,55 @@ export const requireAdmin = async (req, res, next) => {
                 .eq('id', req.user.id)
                 .single();
 
-            if (!profile || profile.role !== 'ADMIN') {
+            const adminRoles = ['ADMIN', 'MASTER_ADMIN'];
+            if (!profile || !adminRoles.includes(profile.role)) {
                 return res.status(403).json({ error: 'Access denied: Admins only' });
             }
 
+            req.userRole = profile.role;
+            next();
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+export const requireMasterAdmin = async (req, res, next) => {
+    try {
+        await requireAuth(req, res, async () => {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', req.user.id)
+                .single();
+
+            if (!profile || profile.role !== 'MASTER_ADMIN') {
+                return res.status(403).json({ error: 'Access denied: Master Admin only' });
+            }
+
+            req.userRole = profile.role;
+            next();
+        });
+    } catch (error) {
+        res.status(500).json({ error: 'Internal server error' });
+    }
+};
+
+export const requireModeratorOrAbove = async (req, res, next) => {
+    try {
+        await requireAuth(req, res, async () => {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', req.user.id)
+                .single();
+
+            const allowedRoles = ['MODERATOR', 'ADMIN', 'MASTER_ADMIN'];
+            if (!profile || !allowedRoles.includes(profile.role)) {
+                return res.status(403).json({ error: 'Access denied: Moderator or higher required' });
+            }
+
+            req.userRole = profile.role;
             next();
         });
     } catch (error) {

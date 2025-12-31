@@ -1,11 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserActivity, Language } from '../../types';
-import { TRANSLATIONS, MOCK_USER_ACTIVITIES } from '../../constants';
+import { TRANSLATIONS } from '../../constants';
 import {
     Search, Download, MapPin, Monitor, Clock,
     MessageSquare, BarChart2, ChevronRight, X,
-    Globe, Wifi, Shield
+    Globe, Wifi, Shield, Loader2
 } from 'lucide-react';
+import { getUserActivities, getOnlineUsers } from '../../services/supabaseService';
 
 interface ReportsTabProps {
     lang: Language;
@@ -14,9 +15,32 @@ interface ReportsTabProps {
 export const ReportsTab: React.FC<ReportsTabProps> = ({ lang }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedUser, setSelectedUser] = useState<UserActivity | null>(null);
+    const [userActivities, setUserActivities] = useState<UserActivity[]>([]);
+    const [loading, setLoading] = useState(true);
     const t = TRANSLATIONS[lang].reports;
 
-    const filteredUsers = MOCK_USER_ACTIVITIES.filter(user =>
+    useEffect(() => {
+        const fetchActivities = async () => {
+            try {
+                // Try to get event-based activities first, fall back to online users
+                const activities = await getUserActivities();
+                if (activities.length > 0) {
+                    setUserActivities(activities);
+                } else {
+                    // If no event activities, get online users
+                    const onlineUsers = await getOnlineUsers();
+                    setUserActivities(onlineUsers);
+                }
+            } catch (error) {
+                console.error('Failed to fetch user activities:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchActivities();
+    }, []);
+
+    const filteredUsers = userActivities.filter(user =>
         user.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.userId.toLowerCase().includes(searchTerm.toLowerCase())
@@ -55,6 +79,14 @@ export const ReportsTab: React.FC<ReportsTabProps> = ({ lang }) => {
         link.click();
         document.body.removeChild(link);
     };
+
+    if (loading) {
+        return (
+            <div className="flex h-full items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-full gap-6">

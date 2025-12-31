@@ -8,10 +8,10 @@ import { Poll, Survey, Language, Message, Question } from '../../types';
 // import { suggestPollQuestion, generateSurvey } from '../../services/geminiService'; // Disabled - Gemini not needed
 
 interface EngagementTabProps {
-  poll: Poll;
-  survey: Survey;
-  updatePoll: (p: Poll) => void;
-  updateSurvey: (s: Survey) => void;
+  poll: Poll | null;
+  survey: Survey | null;
+  updatePoll: (p: Poll | null) => void;
+  updateSurvey: (s: Survey | null) => void;
   messages: Message[];
   questions: Question[];
   lang: Language;
@@ -29,8 +29,8 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
   const [aiLoading, setAiLoading] = useState(false);
   const [surveyLoading, setSurveyLoading] = useState(false);
   const [editingPoll, setEditingPoll] = useState(false);
-  const [newPollQuestion, setNewPollQuestion] = useState(poll.question);
-  const [newPollOptions, setNewPollOptions] = useState(poll.options.map(o => o.text));
+  const [newPollQuestion, setNewPollQuestion] = useState(poll?.question || '');
+  const [newPollOptions, setNewPollOptions] = useState(poll?.options?.map(o => o.text) || ['', '', '']);
 
   const handleGeneratePoll = async () => {
     setAiLoading(true);
@@ -52,15 +52,18 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
   };
 
   const handleSavePoll = () => {
-    updatePoll({
-      ...poll,
+    const newPoll: Poll = {
+      id: poll?.id || `poll-${Date.now()}`,
       question: newPollQuestion,
+      isActive: poll?.isActive ?? true,
+      totalVotes: poll?.totalVotes || 0,
       options: newPollOptions.map((text, i) => ({
-        id: `o${i}`,
+        id: poll?.options[i]?.id || `o${i}`,
         text,
-        votes: poll.options[i]?.votes || 0
+        votes: poll?.options[i]?.votes || 0
       }))
-    });
+    };
+    updatePoll(newPoll);
     setEditingPoll(false);
   };
 
@@ -73,11 +76,15 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
   };
 
   const togglePollActive = () => {
-    updatePoll({ ...poll, isActive: !poll.isActive });
+    if (poll) {
+      updatePoll({ ...poll, isActive: !poll.isActive });
+    }
   };
 
   const toggleSurveyActive = () => {
-    updateSurvey({ ...survey, isActive: !survey.isActive });
+    if (survey) {
+      updateSurvey({ ...survey, isActive: !survey.isActive });
+    }
   };
 
   return (
@@ -123,7 +130,7 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
               <div className="flex items-center gap-2">
                 <BarChart3 className="w-4 h-4 text-indigo-400" />
                 <span className="text-sm font-bold text-white">Active Poll</span>
-                {poll.isActive && (
+                {poll?.isActive && (
                   <span className="flex items-center gap-1 text-[10px] text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full">
                     <div className="w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse"></div>
                     LIVE
@@ -139,12 +146,12 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
                 </button>
                 <button
                   onClick={togglePollActive}
-                  className={`p-1.5 rounded transition-colors ${poll.isActive
+                  className={`p-1.5 rounded transition-colors ${poll?.isActive
                       ? 'text-red-400 hover:bg-red-500/10'
                       : 'text-emerald-400 hover:bg-emerald-500/10'
                     }`}
                 >
-                  {poll.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  {poll?.isActive ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -210,7 +217,7 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : poll ? (
                 <>
                   <h4 className="text-lg font-medium text-white mb-4">{poll.question}</h4>
                   <div className="space-y-3">
@@ -242,6 +249,10 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
                     </span>
                   </div>
                 </>
+              ) : (
+                <div className="text-center text-slate-500 py-4">
+                  <p>No poll created yet. Click edit to create one.</p>
+                </div>
               )}
             </div>
           </div>
@@ -254,7 +265,7 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
               <div className="flex items-center gap-2">
                 <ClipboardList className="w-4 h-4 text-purple-400" />
                 <span className="text-sm font-bold text-white">Active Survey</span>
-                {survey.isActive && (
+                {survey?.isActive && (
                   <span className="flex items-center gap-1 text-[10px] text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                     <CheckCircle className="w-3 h-3" /> Active
                   </span>
@@ -262,49 +273,57 @@ export const EngagementTab: React.FC<EngagementTabProps> = ({
               </div>
               <button
                 onClick={toggleSurveyActive}
-                className={`p-1.5 rounded transition-colors ${survey.isActive
+                className={`p-1.5 rounded transition-colors ${survey?.isActive
                     ? 'text-red-400 hover:bg-red-500/10'
                     : 'text-emerald-400 hover:bg-emerald-500/10'
                   }`}
               >
-                {survey.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                {survey?.isActive ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
 
             <div className="p-4">
-              <h4 className="text-lg font-medium text-white mb-4">{survey.title}</h4>
-              <div className="space-y-4">
-                {survey.fields.map((field, i) => (
-                  <div key={field.id} className="bg-slate-900/50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
-                        {field.type}
-                      </span>
-                      <span className="text-sm text-slate-300">{field.question}</span>
-                    </div>
-                    {field.type === 'RATING' && (
-                      <div className="flex gap-1">
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <div key={n} className="w-8 h-8 bg-slate-800 rounded flex items-center justify-center text-xs text-slate-500">
-                            {n}
+              {survey ? (
+                <>
+                  <h4 className="text-lg font-medium text-white mb-4">{survey.title}</h4>
+                  <div className="space-y-4">
+                    {survey.fields.map((field, i) => (
+                      <div key={field.id} className="bg-slate-900/50 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] text-slate-500 bg-slate-800 px-2 py-0.5 rounded">
+                            {field.type}
+                          </span>
+                          <span className="text-sm text-slate-300">{field.question}</span>
+                        </div>
+                        {field.type === 'RATING' && (
+                          <div className="flex gap-1">
+                            {[1, 2, 3, 4, 5].map(n => (
+                              <div key={n} className="w-8 h-8 bg-slate-800 rounded flex items-center justify-center text-xs text-slate-500">
+                                {n}
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        )}
+                        {field.type === 'TEXT' && (
+                          <div className="h-12 bg-slate-800 rounded border border-slate-700 flex items-center px-3 text-xs text-slate-600">
+                            Text response field...
+                          </div>
+                        )}
                       </div>
-                    )}
-                    {field.type === 'TEXT' && (
-                      <div className="h-12 bg-slate-800 rounded border border-slate-700 flex items-center px-3 text-xs text-slate-600">
-                        Text response field...
-                      </div>
-                    )}
+                    ))}
                   </div>
-                ))}
-              </div>
-              <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
-                <span>142 responses collected</span>
-                <span className="flex items-center gap-1">
-                  <ThumbsUp className="w-3 h-3" /> 4.2 avg rating
-                </span>
-              </div>
+                  <div className="mt-4 flex items-center justify-between text-xs text-slate-500">
+                    <span>142 responses collected</span>
+                    <span className="flex items-center gap-1">
+                      <ThumbsUp className="w-3 h-3" /> 4.2 avg rating
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="text-center text-slate-500 py-4">
+                  <p>No survey created yet.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

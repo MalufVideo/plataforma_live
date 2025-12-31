@@ -8,8 +8,8 @@ interface EngagementPanelProps {
   currentUser: User;
   messages: Message[];
   questions: Question[];
-  poll: Poll;
-  survey?: Survey;
+  poll: Poll | null;
+  survey?: Survey | null;
   onSendMessage: (text: string) => void;
   onVotePoll: (optionId: string) => void;
   onUpvoteQuestion: (qId: string) => void;
@@ -202,28 +202,34 @@ export const EngagementPanel: React.FC<EngagementPanelProps> = ({
         {/* POLLS TAB */}
         {activeTab === EngagementType.POLLS && (
             <div className="p-6">
+                {!poll || !poll.isActive ? (
+                    <div className="flex flex-col items-center justify-center h-64 text-slate-500">
+                        <BarChart2 className="w-12 h-12 mb-4 opacity-50" />
+                        <p>No active polls at the moment</p>
+                    </div>
+                ) : (
                 <div className="bg-slate-800 rounded-xl p-5 border border-slate-700 shadow-xl">
                     <div className="flex items-center gap-2 mb-4">
                         <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded animate-pulse">LIVE</span>
                         <h3 className="font-bold text-slate-100">{t.currentPoll}</h3>
                     </div>
                     <p className="text-lg font-medium text-white mb-6">{poll.question}</p>
-                    
+
                     <div className="space-y-3">
                         {poll.options.map((opt) => {
-                            const percent = Math.round((opt.votes / poll.totalVotes) * 100) || 0;
+                            const percent = poll.totalVotes > 0 ? Math.round((opt.votes / poll.totalVotes) * 100) : 0;
                             return (
-                                <button 
+                                <button
                                     key={opt.id}
                                     onClick={() => onVotePoll(opt.id)}
                                     className="w-full relative group overflow-hidden rounded-lg bg-slate-900 border border-slate-600 hover:border-indigo-500 transition-all p-3 text-left"
                                 >
                                     {/* Progress Bar Background */}
-                                    <div 
+                                    <div
                                         className="absolute inset-0 bg-indigo-600/20 transition-all duration-1000 ease-out"
                                         style={{ width: `${percent}%` }}
                                     ></div>
-                                    
+
                                     <div className="relative z-10 flex justify-between items-center">
                                         <span className="text-sm font-medium text-slate-200 group-hover:text-white">{opt.text}</span>
                                         <span className="text-sm font-bold text-indigo-400">{percent}%</span>
@@ -234,6 +240,7 @@ export const EngagementPanel: React.FC<EngagementPanelProps> = ({
                     </div>
                     <p className="text-center text-xs text-slate-500 mt-4">{poll.totalVotes} {t.votes}</p>
                 </div>
+                )}
             </div>
         )}
 

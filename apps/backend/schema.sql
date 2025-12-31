@@ -17,12 +17,15 @@ CREATE TABLE profiles (
 -- Projects
 CREATE TABLE projects (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  owner_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   name TEXT NOT NULL,
   description TEXT,
   status TEXT DEFAULT 'DRAFT', -- DRAFT, LIVE, ENDED
   is_on_demand BOOLEAN DEFAULT FALSE,
+  is_public BOOLEAN DEFAULT TRUE,
   youtube_video_id TEXT,
   thumbnail TEXT,
+  rtmp_stream_key TEXT UNIQUE NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   started_at TIMESTAMP WITH TIME ZONE,
   ended_at TIMESTAMP WITH TIME ZONE,
@@ -217,6 +220,60 @@ INSERT INTO transcoding_profiles (name, width, height, video_bitrate, audio_bitr
   ('360p', 640, 360, '600k', '64k', 30, 'veryfast', false);
 
 -- =============================================
+-- PARTY MANAGEMENT
+-- =============================================
+
+-- Parties
+CREATE TABLE parties (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  host_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  party_date TIMESTAMP WITH TIME ZONE,
+  location TEXT,
+  max_guests INTEGER,
+  status TEXT DEFAULT 'DRAFT', -- DRAFT, PUBLISHED, CANCELLED, COMPLETED
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Party Invitations
+CREATE TABLE party_invitations (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  party_id UUID REFERENCES parties(id) ON DELETE CASCADE NOT NULL,
+  guest_email TEXT NOT NULL,
+  guest_name TEXT,
+  guest_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  invitation_status TEXT DEFAULT 'PENDING', -- PENDING, CONFIRMED, DECLINED, CANCELLED
+  invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  responded_at TIMESTAMP WITH TIME ZONE,
+  attended BOOLEAN DEFAULT FALSE,
+  notes TEXT,
+  reminder_sent_at TIMESTAMP WITH TIME ZONE,
+  UNIQUE(party_id, guest_email)
+);
+
+-- =============================================
+-- PROJECT GUEST MANAGEMENT
+-- =============================================
+
+-- Project Guests (invitations to projects as rooms)
+CREATE TABLE project_guests (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  project_id UUID REFERENCES projects(id) ON DELETE CASCADE NOT NULL,
+  guest_email TEXT NOT NULL,
+  guest_name TEXT,
+  guest_user_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
+  invitation_status TEXT DEFAULT 'PENDING', -- PENDING, CONFIRMED, DECLINED, CANCELLED
+  invited_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  responded_at TIMESTAMP WITH TIME ZONE,
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(project_id, guest_email)
+);
+
+-- =============================================
 -- FUNCTIONS & TRIGGERS
 -- =============================================
 
@@ -242,6 +299,20 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Update timestamp for project_guests
+CREATE OR REPLACE FUNCTION update_project_guests_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER project_guests_updated_at
+  BEFORE UPDATE ON project_guests
+  FOR EACH ROW
+  EXECUTE FUNCTION update_project_guests_updated_at();
+
 -- =============================================
 -- RLS POLICIES
 -- =============================================
@@ -262,16 +333,19 @@ ALTER TABLE surveys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE survey_fields ENABLE ROW LEVEL SECURITY;
 ALTER TABLE survey_responses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE event_users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE parties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE party_invitations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE project_guests ENABLE ROW LEVEL SECURITY;
 
 -- Profiles: Public read, Owner write
 CREATE POLICY "Public profiles are viewable by everyone" ON profiles FOR SELECT USING (true);
 CREATE POLICY "Users can update own profile" ON profiles FOR UPDATE USING (auth.uid() = id);
 
--- Projects: Public read, Admin write
-CREATE POLICY "Public projects are viewable by everyone" ON projects FOR SELECT USING (true);
+-- Projects: Public read, Owner/Admin write
+CREATE POLICY "Public projects are viewable by everyone" ON projects FOR SELECT USING (is_public = true OR owner_id = auth.uid());
 CREATE POLICY "Admins can insert projects" ON projects FOR INSERT WITH CHECK ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
-CREATE POLICY "Admins can update projects" ON projects FOR UPDATE USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
-CREATE POLICY "Admins can delete projects" ON projects FOR DELETE USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+CREATE POLICY "Project owners can update their projects" ON projects FOR UPDATE USING (owner_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN'));
+CREATE POLICY "Project owners can delete their projects" ON projects FOR DELETE USING (owner_id = auth.uid() OR EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN'));
 
 -- Events/Sessions/Streams/Rooms: Public read, Admin write
 -- (Repeating pattern for content tables)
@@ -298,6 +372,68 @@ CREATE POLICY "Admins can manage polls" ON polls FOR ALL USING ( EXISTS (SELECT 
 CREATE POLICY "Votes viewable by everyone" ON poll_votes FOR SELECT USING (true);
 CREATE POLICY "Authenticated users can vote" ON poll_votes FOR INSERT WITH CHECK (auth.role() = 'authenticated');
 
+-- Parties: Host can view/edit their own, everyone can view published
+CREATE POLICY "Users can view their own parties" ON parties FOR SELECT USING (host_id = auth.uid() OR status = 'PUBLISHED');
+CREATE POLICY "Users can create parties" ON parties FOR INSERT WITH CHECK (host_id = auth.uid());
+CREATE POLICY "Hosts can update their parties" ON parties FOR UPDATE USING (host_id = auth.uid());
+CREATE POLICY "Hosts can delete their parties" ON parties FOR DELETE USING (host_id = auth.uid());
+
+-- Party Invitations: Hosts can manage, guests can view/respond to their own
+CREATE POLICY "Hosts can view party invitations" ON party_invitations FOR SELECT USING (
+  party_id IN (SELECT id FROM parties WHERE host_id = auth.uid())
+);
+CREATE POLICY "Guests can view their invitations" ON party_invitations FOR SELECT USING (
+  guest_user_id = auth.uid() OR
+  guest_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+);
+CREATE POLICY "Hosts can manage invitations" ON party_invitations FOR INSERT WITH CHECK (
+  party_id IN (SELECT id FROM parties WHERE host_id = auth.uid())
+);
+CREATE POLICY "Guests can RSVP" ON party_invitations FOR UPDATE USING (
+  guest_user_id = auth.uid() OR
+  guest_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+);
+CREATE POLICY "Hosts can delete invitations" ON party_invitations FOR DELETE USING (
+  party_id IN (SELECT id FROM parties WHERE host_id = auth.uid())
+);
+
+-- Project Guests: Project owners can manage, guests can view/respond to their own
+CREATE POLICY "Project owners can view their project guests" ON project_guests FOR SELECT USING (
+  project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+);
+CREATE POLICY "Guests can view their own invitations" ON project_guests FOR SELECT USING (
+  guest_user_id = auth.uid() OR
+  guest_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+);
+CREATE POLICY "Project owners can add guests to their projects" ON project_guests FOR INSERT WITH CHECK (
+  project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+);
+CREATE POLICY "Project owners can update their project guests" ON project_guests FOR UPDATE USING (
+  project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+);
+CREATE POLICY "Guests can RSVP to their invitations" ON project_guests FOR UPDATE USING (
+  guest_user_id = auth.uid() OR
+  guest_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+) WITH CHECK (
+  guest_user_id = auth.uid() OR
+  guest_email = (SELECT email FROM auth.users WHERE id = auth.uid())
+);
+CREATE POLICY "Project owners can delete their project guests" ON project_guests FOR DELETE USING (
+  project_id IN (SELECT id FROM projects WHERE owner_id = auth.uid())
+);
+
+-- RTMP Ingest Configs: Admin only
+CREATE POLICY "RTMP configs viewable by admins" ON rtmp_ingest_configs FOR SELECT USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+CREATE POLICY "Admins can manage RTMP configs" ON rtmp_ingest_configs FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+
+-- Transcoding Profiles: Public read, Admin write
+CREATE POLICY "Transcoding profiles viewable by everyone" ON transcoding_profiles FOR SELECT USING (true);
+CREATE POLICY "Admins can manage transcoding profiles" ON transcoding_profiles FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+
+-- Transcoding Jobs: Admin only
+CREATE POLICY "Transcoding jobs viewable by admins" ON transcoding_jobs FOR SELECT USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+CREATE POLICY "Admins can manage transcoding jobs" ON transcoding_jobs FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+
 -- =============================================
 -- INDEXES
 -- =============================================
@@ -309,22 +445,13 @@ CREATE UNIQUE INDEX idx_profiles_username ON profiles(username) WHERE username I
 CREATE INDEX idx_rtmp_stream_key ON rtmp_ingest_configs(stream_key);
 CREATE INDEX idx_transcoding_jobs_stream ON transcoding_jobs(stream_id, status);
 CREATE INDEX idx_transcoding_jobs_status ON transcoding_jobs(status);
-
--- =============================================
--- RLS POLICIES FOR NEW TABLES
--- =============================================
-
--- RTMP Ingest Configs: Admin only
-ALTER TABLE rtmp_ingest_configs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "RTMP configs viewable by admins" ON rtmp_ingest_configs FOR SELECT USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
-CREATE POLICY "Admins can manage RTMP configs" ON rtmp_ingest_configs FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
-
--- Transcoding Profiles: Public read, Admin write
-ALTER TABLE transcoding_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Transcoding profiles viewable by everyone" ON transcoding_profiles FOR SELECT USING (true);
-CREATE POLICY "Admins can manage transcoding profiles" ON transcoding_profiles FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
-
--- Transcoding Jobs: Admin only
-ALTER TABLE transcoding_jobs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Transcoding jobs viewable by admins" ON transcoding_jobs FOR SELECT USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
-CREATE POLICY "Admins can manage transcoding jobs" ON transcoding_jobs FOR ALL USING ( EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'ADMIN') );
+CREATE INDEX idx_projects_owner ON projects(owner_id);
+CREATE INDEX idx_projects_status ON projects(status);
+CREATE INDEX idx_parties_host ON parties(host_id);
+CREATE INDEX idx_parties_status ON parties(status);
+CREATE INDEX idx_party_invitations_party ON party_invitations(party_id);
+CREATE INDEX idx_party_invitations_guest_email ON party_invitations(guest_email);
+CREATE INDEX idx_party_invitations_guest_user ON party_invitations(guest_user_id);
+CREATE INDEX idx_project_guests_project ON project_guests(project_id);
+CREATE INDEX idx_project_guests_guest_email ON project_guests(guest_email);
+CREATE INDEX idx_project_guests_guest_user ON project_guests(guest_user_id);

@@ -1,8 +1,12 @@
 import { createClient, SupabaseClient, User, Session } from '@supabase/supabase-js';
-import { User as AppUser, UserRole, Message, Question, Poll, PollOption, Room, Session as EventSession, Project } from '../types';
+import { User as AppUser, UserRole, Message, Question, Poll, PollOption, Room, Session as EventSession, Project, ProjectGuest, ProjectGuestWithProject, Survey, SurveyField, UserActivity } from '../types';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://supabasekong-mo0gsg800wo4csgw4w04gggs.72.60.142.28.sslip.io';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsImlhdCI6MTc2NDYzNzMyMCwiZXhwIjo0OTIwMzEwOTIwLCJyb2xlIjoiYW5vbiJ9.CqUFsTjOYVzcSNZBWCrVBsMTlWDJz5RTU_s24lm604w';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -553,6 +557,120 @@ export const subscribeToPolls = (sessionId: string, callback: (polls: Poll[]) =>
 };
 
 // =============================================
+// SURVEY FUNCTIONS
+// =============================================
+
+export const getSurveys = async (sessionId: string): Promise<Survey[]> => {
+  const { data, error } = await supabase
+    .from('surveys')
+    .select(`
+      *,
+      survey_fields (*)
+    `)
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map(s => ({
+    id: s.id,
+    title: s.title,
+    isActive: s.is_active,
+    fields: (s.survey_fields || []).map((f: any) => ({
+      id: f.id,
+      question: f.question,
+      type: f.type,
+      options: f.options
+    }))
+  }));
+};
+
+export const getActiveSurvey = async (sessionId: string): Promise<Survey | null> => {
+  const surveys = await getSurveys(sessionId);
+  return surveys.find(s => s.isActive) || null;
+};
+
+export const createSurvey = async (sessionId: string, title: string, fields: Omit<SurveyField, 'id'>[]): Promise<Survey> => {
+  // Deactivate any existing active surveys first
+  await supabase
+    .from('surveys')
+    .update({ is_active: false })
+    .eq('session_id', sessionId)
+    .eq('is_active', true);
+
+  const { data: survey, error: surveyError } = await supabase
+    .from('surveys')
+    .insert({
+      session_id: sessionId,
+      title,
+      is_active: true
+    })
+    .select()
+    .single();
+
+  if (surveyError) throw surveyError;
+
+  const surveyFields = fields.map(f => ({
+    survey_id: survey.id,
+    question: f.question,
+    type: f.type,
+    options: f.options
+  }));
+
+  const { data: fieldsData, error: fieldsError } = await supabase
+    .from('survey_fields')
+    .insert(surveyFields)
+    .select();
+
+  if (fieldsError) throw fieldsError;
+
+  return {
+    id: survey.id,
+    title: survey.title,
+    isActive: survey.is_active,
+    fields: (fieldsData || []).map((f: any) => ({
+      id: f.id,
+      question: f.question,
+      type: f.type,
+      options: f.options
+    }))
+  };
+};
+
+export const submitSurveyResponse = async (surveyId: string, responses: Record<string, any>) => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data, error } = await supabase
+    .from('survey_responses')
+    .insert({
+      survey_id: surveyId,
+      user_id: user.id,
+      responses
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const subscribeToSurveys = (sessionId: string, callback: (surveys: Survey[]) => void) => {
+  return supabase
+    .channel(`surveys:${sessionId}`)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'surveys',
+      filter: `session_id=eq.${sessionId}`
+    }, async () => {
+      const surveys = await getSurveys(sessionId);
+      callback(surveys);
+    })
+    .subscribe();
+};
+
+// =============================================
 // ROOMS FUNCTIONS
 // =============================================
 
@@ -571,6 +689,25 @@ export const getRooms = async (eventId: string): Promise<Room[]> => {
     speaker: r.speaker || '',
     topic: r.topic || '',
     viewers: 0, // Would need real-time tracking
+    thumbnail: r.thumbnail || '',
+    isMainStage: r.is_main_stage
+  }));
+};
+
+export const getAllRooms = async (): Promise<Room[]> => {
+  const { data, error } = await supabase
+    .from('rooms')
+    .select('*')
+    .order('is_main_stage', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map(r => ({
+    id: r.id,
+    name: r.name,
+    speaker: r.speaker || '',
+    topic: r.topic || '',
+    viewers: 0,
     thumbnail: r.thumbnail || '',
     isMainStage: r.is_main_stage
   }));
@@ -648,6 +785,107 @@ export const leaveEvent = async (eventId: string) => {
     .eq('user_id', user.id);
 
   if (error) throw error;
+};
+
+// =============================================
+// USER ACTIVITY FUNCTIONS (for Reports)
+// =============================================
+
+export const getUserActivities = async (eventId?: string): Promise<UserActivity[]> => {
+  // Get all event_users with their profiles
+  let query = supabase
+    .from('event_users')
+    .select(`
+      *,
+      profiles:user_id (id, name, email, role, avatar, company, title, status, last_login_at)
+    `)
+    .order('joined_at', { ascending: false });
+
+  if (eventId) {
+    query = query.eq('event_id', eventId);
+  }
+
+  const { data: eventUsers, error: eventUsersError } = await query;
+  if (eventUsersError) throw eventUsersError;
+
+  // Get question counts per user
+  const { data: questionCounts } = await supabase
+    .from('questions')
+    .select('user_id');
+
+  // Get poll vote counts per user
+  const { data: pollVoteCounts } = await supabase
+    .from('poll_votes')
+    .select('user_id');
+
+  // Aggregate counts
+  const questionsByUser: Record<string, number> = {};
+  const pollsByUser: Record<string, number> = {};
+
+  (questionCounts || []).forEach(q => {
+    questionsByUser[q.user_id] = (questionsByUser[q.user_id] || 0) + 1;
+  });
+
+  (pollVoteCounts || []).forEach(p => {
+    pollsByUser[p.user_id] = (pollsByUser[p.user_id] || 0) + 1;
+  });
+
+  return (eventUsers || []).map(eu => {
+    const profile = eu.profiles;
+    const joinedAt = new Date(eu.joined_at).getTime();
+    const leftAt = eu.left_at ? new Date(eu.left_at).getTime() : undefined;
+    const sessionDuration = leftAt
+      ? Math.round((leftAt - joinedAt) / 60000)
+      : Math.round((Date.now() - joinedAt) / 60000);
+
+    return {
+      userId: profile?.id || eu.user_id,
+      userName: profile?.name || 'Unknown User',
+      email: profile?.email || '',
+      role: profile?.role as UserRole || UserRole.ATTENDEE,
+      loginTime: joinedAt,
+      logoutTime: leftAt,
+      sessionDuration,
+      ipAddress: 'N/A', // Would need server-side logging
+      location: 'N/A', // Would need geolocation service
+      device: 'N/A', // Would need user-agent parsing
+      browser: 'N/A',
+      connectionType: 'N/A',
+      questionsAsked: questionsByUser[eu.user_id] || 0,
+      pollsAnswered: pollsByUser[eu.user_id] || 0,
+      engagementScore: eu.engagement_score || 0,
+      history: [] // Would need separate activity logging table
+    };
+  });
+};
+
+export const getOnlineUsers = async (): Promise<UserActivity[]> => {
+  const { data: profiles, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('status', 'ONLINE');
+
+  if (error) throw error;
+
+  return (profiles || []).map(p => ({
+    userId: p.id,
+    userName: p.name,
+    email: p.email,
+    role: p.role as UserRole,
+    loginTime: p.last_login_at ? new Date(p.last_login_at).getTime() : Date.now(),
+    sessionDuration: p.last_login_at
+      ? Math.round((Date.now() - new Date(p.last_login_at).getTime()) / 60000)
+      : 0,
+    ipAddress: 'N/A',
+    location: 'N/A',
+    device: 'N/A',
+    browser: 'N/A',
+    connectionType: 'N/A',
+    questionsAsked: 0,
+    pollsAnswered: 0,
+    engagementScore: 0,
+    history: []
+  }));
 };
 
 // =============================================
@@ -1279,4 +1517,383 @@ export const getMyInvitations = async () => {
   if (error) throw error;
 
   return data;
+};
+
+// =============================================
+// PROJECT GUEST MANAGEMENT FUNCTIONS
+// =============================================
+
+export const getProjectGuests = async (projectId: string): Promise<ProjectGuest[]> => {
+  const { data, error } = await supabase
+    .from('project_guests')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('invited_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((g: any) => ({
+    id: g.id,
+    projectId: g.project_id,
+    guestEmail: g.guest_email,
+    guestName: g.guest_name,
+    guestUserId: g.guest_user_id,
+    invitationStatus: g.invitation_status,
+    invitedAt: new Date(g.invited_at).getTime(),
+    respondedAt: g.responded_at ? new Date(g.responded_at).getTime() : undefined,
+    notes: g.notes,
+    createdAt: new Date(g.created_at).getTime(),
+    updatedAt: new Date(g.updated_at).getTime()
+  }));
+};
+
+export const inviteProjectGuest = async (
+  projectId: string,
+  guestEmail: string,
+  guestName?: string
+): Promise<ProjectGuest> => {
+  const { data, error } = await supabase
+    .from('project_guests')
+    .insert({
+      project_id: projectId,
+      guest_email: guestEmail,
+      guest_name: guestName,
+      invitation_status: 'PENDING'
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    projectId: data.project_id,
+    guestEmail: data.guest_email,
+    guestName: data.guest_name,
+    guestUserId: data.guest_user_id,
+    invitationStatus: data.invitation_status,
+    invitedAt: new Date(data.invited_at).getTime(),
+    respondedAt: data.responded_at ? new Date(data.responded_at).getTime() : undefined,
+    notes: data.notes,
+    createdAt: new Date(data.created_at).getTime(),
+    updatedAt: new Date(data.updated_at).getTime()
+  };
+};
+
+export const bulkInviteProjectGuests = async (
+  projectId: string,
+  guests: { email: string; name?: string }[]
+): Promise<ProjectGuest[]> => {
+  const invitations = guests.map(g => ({
+    project_id: projectId,
+    guest_email: g.email,
+    guest_name: g.name,
+    invitation_status: 'PENDING'
+  }));
+
+  const { data, error } = await supabase
+    .from('project_guests')
+    .insert(invitations)
+    .select();
+
+  if (error) throw error;
+
+  return (data || []).map((g: any) => ({
+    id: g.id,
+    projectId: g.project_id,
+    guestEmail: g.guest_email,
+    guestName: g.guest_name,
+    guestUserId: g.guest_user_id,
+    invitationStatus: g.invitation_status,
+    invitedAt: new Date(g.invited_at).getTime(),
+    respondedAt: g.responded_at ? new Date(g.responded_at).getTime() : undefined,
+    notes: g.notes,
+    createdAt: new Date(g.created_at).getTime(),
+    updatedAt: new Date(g.updated_at).getTime()
+  }));
+};
+
+export const updateProjectGuestStatus = async (
+  guestId: string,
+  status: 'PENDING' | 'CONFIRMED' | 'DECLINED' | 'CANCELLED'
+): Promise<ProjectGuest> => {
+  const { data, error } = await supabase
+    .from('project_guests')
+    .update({
+      invitation_status: status,
+      responded_at: new Date().toISOString()
+    })
+    .eq('id', guestId)
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    projectId: data.project_id,
+    guestEmail: data.guest_email,
+    guestName: data.guest_name,
+    guestUserId: data.guest_user_id,
+    invitationStatus: data.invitation_status,
+    invitedAt: new Date(data.invited_at).getTime(),
+    respondedAt: data.responded_at ? new Date(data.responded_at).getTime() : undefined,
+    notes: data.notes,
+    createdAt: new Date(data.created_at).getTime(),
+    updatedAt: new Date(data.updated_at).getTime()
+  };
+};
+
+export const deleteProjectGuest = async (guestId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('project_guests')
+    .delete()
+    .eq('id', guestId);
+
+  if (error) throw error;
+};
+
+// Get all project invitations for the current user (for guest rooms view)
+export const getMyProjectInvitations = async (): Promise<ProjectGuestWithProject[]> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Get user's email from auth
+  const userEmail = user.email;
+  if (!userEmail) throw new Error('User email not found');
+
+  const { data, error } = await supabase
+    .from('project_guests')
+    .select(`
+      *,
+      projects (*)
+    `)
+    .or(`guest_email.eq.${userEmail},guest_user_id.eq.${user.id}`)
+    .in('invitation_status', ['PENDING', 'CONFIRMED'])
+    .order('invited_at', { ascending: false });
+
+  if (error) throw error;
+
+  return (data || []).map((g: any) => ({
+    id: g.id,
+    projectId: g.project_id,
+    guestEmail: g.guest_email,
+    guestName: g.guest_name,
+    guestUserId: g.guest_user_id,
+    invitationStatus: g.invitation_status,
+    invitedAt: new Date(g.invited_at).getTime(),
+    respondedAt: g.responded_at ? new Date(g.responded_at).getTime() : undefined,
+    notes: g.notes,
+    createdAt: new Date(g.created_at).getTime(),
+    updatedAt: new Date(g.updated_at).getTime(),
+    project: g.projects ? {
+      id: g.projects.id,
+      name: g.projects.name,
+      description: g.projects.description,
+      status: g.projects.status,
+      isOnDemand: g.projects.is_on_demand,
+      isPublic: g.projects.is_public ?? true,
+      createdAt: new Date(g.projects.created_at).getTime(),
+      startedAt: g.projects.started_at ? new Date(g.projects.started_at).getTime() : undefined,
+      endedAt: g.projects.ended_at ? new Date(g.projects.ended_at).getTime() : undefined,
+      youtubeVideoId: g.projects.youtube_video_id,
+      thumbnail: g.projects.thumbnail,
+      viewers: g.projects.viewers,
+      rtmpStreamKey: g.projects.rtmp_stream_key,
+      ownerId: g.projects.owner_id
+    } : null
+  }));
+};
+
+// =============================================
+// TRANSCODING FUNCTIONS
+// =============================================
+
+const API_URL = import.meta.env.VITE_API_URL || 'https://api.livevideo.com.br';
+
+// Helper to get auth headers for backend API calls
+const getAuthHeaders = async (): Promise<HeadersInit> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Not authenticated');
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${session.access_token}`
+  };
+};
+
+export interface TranscodingProfile {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  video_bitrate: string;
+  audio_bitrate: string;
+  framerate: number;
+  preset: string;
+  is_default: boolean;
+  created_at: string;
+}
+
+export interface TranscodingJob {
+  id: string;
+  stream_id: string;
+  profile_id: string;
+  status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+  input_url: string;
+  output_url?: string;
+  hls_playlist_url?: string;
+  progress: number;
+  error_message?: string;
+  started_at?: string;
+  completed_at?: string;
+  created_at: string;
+  transcoding_profiles?: TranscodingProfile;
+}
+
+export interface TranscodingStatus {
+  activeJobs: number;
+  status: string;
+}
+
+// Get all transcoding profiles
+export const getTranscodingProfiles = async (onlyDefaults = false): Promise<TranscodingProfile[]> => {
+  const headers = await getAuthHeaders();
+  const url = `${API_URL}/api/transcoding/profiles${onlyDefaults ? '?defaults=true' : ''}`;
+
+  const response = await fetch(url, { headers });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch transcoding profiles');
+  }
+
+  return response.json();
+};
+
+// Create a new transcoding profile
+export const createTranscodingProfile = async (profile: Omit<TranscodingProfile, 'id' | 'created_at'>): Promise<TranscodingProfile> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/profiles`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(profile)
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to create transcoding profile');
+  }
+
+  return response.json();
+};
+
+// Update a transcoding profile
+export const updateTranscodingProfile = async (id: string, updates: Partial<TranscodingProfile>): Promise<TranscodingProfile> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/profiles/${id}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(updates)
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to update transcoding profile');
+  }
+
+  return response.json();
+};
+
+// Delete a transcoding profile
+export const deleteTranscodingProfile = async (id: string): Promise<void> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/profiles/${id}`, {
+    method: 'DELETE',
+    headers
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete transcoding profile');
+  }
+};
+
+// Get transcoding status
+export const getTranscodingStatus = async (): Promise<TranscodingStatus> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/status`, { headers });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch transcoding status');
+  }
+
+  return response.json();
+};
+
+// Get transcoding jobs for a stream
+export const getTranscodingJobsForStream = async (streamId: string): Promise<TranscodingJob[]> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/jobs/stream/${streamId}`, { headers });
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch transcoding jobs');
+  }
+
+  return response.json();
+};
+
+// Start transcoding with all default profiles
+export const startTranscoding = async (streamId: string, inputUrl: string): Promise<any> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/jobs`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ streamId, inputUrl })
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to start transcoding');
+  }
+
+  return response.json();
+};
+
+// Stop a transcoding job
+export const stopTranscodingJobApi = async (jobId: string): Promise<void> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/jobs/${jobId}`, {
+    method: 'DELETE',
+    headers
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to stop transcoding job');
+  }
+};
+
+// Generate master HLS playlist
+export const generateMasterPlaylistApi = async (streamId: string): Promise<{ masterPlaylistUrl: string }> => {
+  const headers = await getAuthHeaders();
+
+  const response = await fetch(`${API_URL}/api/transcoding/master-playlist/${streamId}`, {
+    method: 'POST',
+    headers
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to generate master playlist');
+  }
+
+  return response.json();
 };

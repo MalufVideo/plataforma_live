@@ -4,7 +4,7 @@ import { TRANSLATIONS } from '../../constants';
 import {
   FolderPlus, Trash2, CheckCircle, Radio, FileEdit, Play, Eye,
   ToggleLeft, ToggleRight, X, Calendar, Users, Plus, AlertTriangle, Copy, Key,
-  Share2, ExternalLink
+  Share2, ExternalLink, UserPlus
 } from 'lucide-react';
 
 interface ProjectsTabProps {
@@ -14,6 +14,7 @@ interface ProjectsTabProps {
   onSelectProject: (projectId: string) => void;
   onDeleteProject: (projectId: string) => void;
   onToggleOnDemand: (projectId: string) => void;
+  onManageGuests: (projectId: string) => void;
   lang: Language;
 }
 
@@ -24,6 +25,7 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
   onSelectProject,
   onDeleteProject,
   onToggleOnDemand,
+  onManageGuests,
   lang
 }) => {
   const t = TRANSLATIONS[lang].projects;
@@ -245,6 +247,15 @@ export const ProjectsTab: React.FC<ProjectsTabProps> = ({
                     title={lang === 'pt' ? 'Compartilhar' : 'Share'}
                   >
                     <Share2 className="w-4 h-4" />
+                  </button>
+
+                  {/* Guest Management Button */}
+                  <button
+                    onClick={() => onManageGuests(project.id)}
+                    className="flex items-center justify-center p-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
+                    title={lang === 'pt' ? 'Gerenciar Convidados' : 'Manage Guests'}
+                  >
+                    <UserPlus className="w-4 h-4" />
                   </button>
 
                   {/* RTMP Key Button */}

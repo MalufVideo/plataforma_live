@@ -10,10 +10,11 @@ import { ChannelPage } from './pages/ChannelPage';
 import { PublicViewer } from './pages/PublicViewer';
 import { ResetPasswordPage } from './pages/ResetPasswordPage';
 import { PartyManagementPage } from './pages/PartyManagementPage';
-import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project } from './types';
-import { MOCK_SESSION, INITIAL_MESSAGES, INITIAL_QUESTIONS, INITIAL_POLL, INITIAL_SURVEY, TRANSLATIONS, MOCK_PROJECTS } from './constants';
+import { GuestProjectRooms } from './components/GuestProjectRooms';
+import { StreamSource, UserRole, Message, Question, Poll, Survey, Language, User, Project, Session } from './types';
+import { TRANSLATIONS } from './constants';
 import { MessageSquare, X } from 'lucide-react';
-import { getCurrentUser, onAuthStateChange, signOut, getProjects, createProject, deleteProject, toggleProjectOnDemand } from './services/supabaseService';
+import { getCurrentUser, onAuthStateChange, signOut, getProjects, createProject, deleteProject, toggleProjectOnDemand, getMessages, getQuestions, getActivePoll, getActiveSurvey, subscribeToMessages, subscribeToQuestions, subscribeToPolls, subscribeToSurveys } from './services/supabaseService';
 
 const App: React.FC = () => {
   // Authentication State
@@ -28,11 +29,12 @@ const App: React.FC = () => {
   const [showMobileChat, setShowMobileChat] = useState(false);
 
   // Data State
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
-  const [questions, setQuestions] = useState<Question[]>(INITIAL_QUESTIONS);
-  const [poll, setPoll] = useState<Poll>(INITIAL_POLL);
-  const [survey, setSurvey] = useState<Survey>(INITIAL_SURVEY);
-  const [viewers, setViewers] = useState(MOCK_SESSION.viewers);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [poll, setPoll] = useState<Poll | null>(null);
+  const [survey, setSurvey] = useState<Survey | null>(null);
+  const [viewers, setViewers] = useState(0);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   // Projects State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -131,6 +133,34 @@ const App: React.FC = () => {
 
     loadProjects();
   }, [user]);
+
+  // Update viewers and session data when project changes
+  useEffect(() => {
+    const currentProject = projects.find(p => p.id === currentProjectId);
+    if (currentProject) {
+      setViewers(currentProject.viewers);
+      if (currentProject.youtubeVideoId) {
+        setYoutubeVideoId(currentProject.youtubeVideoId);
+      }
+    }
+  }, [currentProjectId, projects]);
+
+  // Derive current session from project for display
+  const currentProject = projects.find(p => p.id === currentProjectId);
+  const currentSession: Session | null = currentProject ? {
+    id: currentProject.id,
+    title: currentProject.name,
+    description: currentProject.description,
+    speaker: 'Live Stream',
+    startTime: currentProject.startedAt
+      ? new Date(currentProject.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '--:--',
+    endTime: currentProject.endedAt
+      ? new Date(currentProject.endedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : '--:--',
+    status: currentProject.status === 'LIVE' ? 'LIVE' : currentProject.status === 'ENDED' ? 'ENDED' : 'UPCOMING',
+    viewers: currentProject.viewers
+  } : null;
 
   // Check auth state on mount and listen for changes
   useEffect(() => {
@@ -237,6 +267,11 @@ const App: React.FC = () => {
     console.log(`Joining Room: ${roomId}`);
     setActiveTab('stage');
     setSource(roomId === 'r1' ? StreamSource.CUSTOM_RTMP : StreamSource.HLS);
+  };
+
+  // Handle joining a project room (for guest view)
+  const handleJoinProjectRoom = (projectId: string) => {
+    navigateToWatch(projectId);
   };
 
   // Project Management Handlers
@@ -350,7 +385,7 @@ const App: React.FC = () => {
   if (user.role === UserRole.ADMIN) {
     return (
       <AdminConsole
-        session={MOCK_SESSION}
+        session={currentSession}
         currentSource={source}
         setSource={setSource}
         setYoutubeVideoId={setYoutubeVideoId}
@@ -378,19 +413,19 @@ const App: React.FC = () => {
 
       <main className="flex-1 flex flex-col relative overflow-hidden mb-16 md:mb-0">
         {activeTab === 'rooms' ? (
-          <BreakoutRooms onJoinRoom={handleJoinRoom} lang={lang} />
+          <GuestProjectRooms onJoinRoom={handleJoinProjectRoom} lang={lang} />
         ) : activeTab === 'parties' ? (
           <PartyManagementPage />
         ) : (
           <div className="flex flex-1 overflow-hidden flex-col lg:flex-row relative">
             <div className="flex-1 flex flex-col overflow-y-auto bg-black custom-scrollbar">
-              {activeTab === 'stage' ? (
+              {activeTab === 'stage' && currentSession ? (
                 <>
                   <div className="sticky top-0 z-20 w-full bg-black shadow-lg">
                     <VideoPlayer
                       source={source}
                       youtubeVideoId={youtubeVideoId}
-                      isLive={MOCK_SESSION.status === 'LIVE'}
+                      isLive={currentSession.status === 'LIVE'}
                       role={user.role}
                       lang={lang}
                     />
@@ -399,14 +434,14 @@ const App: React.FC = () => {
                   <div className="px-4 md:px-6 pb-20 md:pb-8 max-w-6xl mx-auto w-full pt-4">
                     <div className="flex flex-col md:flex-row md:items-start justify-between mb-6 gap-4">
                       <div>
-                        <h1 className="text-xl md:text-2xl font-bold text-white mb-2">{MOCK_SESSION.title}</h1>
+                        <h1 className="text-xl md:text-2xl font-bold text-white mb-2">{currentSession.title}</h1>
                         <div className="flex flex-wrap items-center gap-4 text-xs md:text-sm text-slate-400">
                           <span className="flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full">
                             <div className="w-5 h-5 rounded-full bg-indigo-600 flex items-center justify-center text-[10px] text-white font-bold">SC</div>
-                            {MOCK_SESSION.speaker}
+                            {currentSession.speaker}
                           </span>
-                          <span>{MOCK_SESSION.startTime} - {MOCK_SESSION.endTime}</span>
-                          <span className="text-emerald-500 font-bold">• {t.live}</span>
+                          <span>{currentSession.startTime} - {currentSession.endTime}</span>
+                          {currentSession.status === 'LIVE' && <span className="text-emerald-500 font-bold">• {t.live}</span>}
                         </div>
                       </div>
                       <div className="flex gap-2">
@@ -420,7 +455,7 @@ const App: React.FC = () => {
                     </div>
                     <div className="bg-slate-900 rounded-xl p-4 md:p-6 border border-slate-800">
                       <h3 className="font-bold text-white mb-2">{t.about}</h3>
-                      <p className="text-slate-400 leading-relaxed text-sm md:text-base">{MOCK_SESSION.description}</p>
+                      <p className="text-slate-400 leading-relaxed text-sm md:text-base">{currentSession.description}</p>
 
                       <div className="mt-6 pt-6 border-t border-slate-800 flex flex-wrap gap-4">
                         <div className="flex items-center gap-2">
@@ -435,6 +470,13 @@ const App: React.FC = () => {
                     </div>
                   </div>
                 </>
+              ) : activeTab === 'stage' && !currentSession ? (
+                <div className="flex items-center justify-center h-full text-slate-500">
+                  <div className="text-center">
+                    <p className="text-lg mb-2">No active stream</p>
+                    <p className="text-sm">Create a project to start streaming</p>
+                  </div>
+                </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-slate-500">
                   <p>View for {activeTab} coming soon...</p>
@@ -442,7 +484,7 @@ const App: React.FC = () => {
               )}
             </div>
 
-            {activeTab === 'stage' && (
+            {activeTab === 'stage' && currentSession && (
               <button
                 onClick={() => setShowMobileChat(!showMobileChat)}
                 className="lg:hidden fixed bottom-20 right-4 z-40 bg-indigo-600 text-white p-3 rounded-full shadow-2xl shadow-indigo-900/50"
@@ -454,7 +496,7 @@ const App: React.FC = () => {
             <div className={`
                 fixed lg:relative inset-0 lg:inset-auto z-30 lg:z-auto bg-slate-900 lg:bg-transparent lg:w-96
                 transition-transform duration-300 transform
-                ${activeTab === 'stage' ? '' : 'hidden'}
+                ${activeTab === 'stage' && currentSession ? '' : 'hidden'}
                 ${showMobileChat ? 'translate-y-0' : 'translate-y-full lg:translate-y-0'}
             `}>
               <div className="lg:hidden flex items-center justify-between p-4 border-b border-slate-800 bg-slate-900">

@@ -174,3 +174,23 @@ export interface PartyInvitation {
   notes?: string;
   reminderSentAt?: number;
 }
+
+// Project Guest Management
+export interface ProjectGuest {
+  id: string;
+  projectId: string;
+  guestEmail: string;
+  guestName?: string;
+  guestUserId?: string;
+  invitationStatus: InvitationStatus;
+  invitedAt: number;
+  respondedAt?: number;
+  notes?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Extended type that includes project details (for guest's room view)
+export interface ProjectGuestWithProject extends ProjectGuest {
+  project: Project;
+}

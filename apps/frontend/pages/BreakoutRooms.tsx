@@ -1,7 +1,8 @@
-import React from 'react';
-import { MOCK_ROOMS, TRANSLATIONS } from '../constants';
-import { Users, ArrowRight } from 'lucide-react';
-import { Language } from '../types';
+import React, { useState, useEffect } from 'react';
+import { TRANSLATIONS } from '../constants';
+import { Users, ArrowRight, Loader2 } from 'lucide-react';
+import { Language, Room } from '../types';
+import { getAllRooms } from '../services/supabaseService';
 
 interface BreakoutRoomsProps {
   onJoinRoom: (roomId: string) => void;
@@ -10,6 +11,30 @@ interface BreakoutRoomsProps {
 
 export const BreakoutRooms: React.FC<BreakoutRoomsProps> = ({ onJoinRoom, lang }) => {
   const t = TRANSLATIONS[lang].rooms;
+  const [rooms, setRooms] = useState<Room[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      try {
+        const fetchedRooms = await getAllRooms();
+        setRooms(fetchedRooms);
+      } catch (error) {
+        console.error('Failed to fetch rooms:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRooms();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="p-4 md:p-8 h-full flex items-center justify-center bg-slate-950">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 md:p-8 h-full overflow-y-auto bg-slate-950 pb-20 md:pb-8">
@@ -19,8 +44,13 @@ export const BreakoutRooms: React.FC<BreakoutRoomsProps> = ({ onJoinRoom, lang }
             <p className="text-slate-400">{t.subtitle}</p>
         </div>
 
+        {rooms.length === 0 ? (
+          <div className="text-center text-slate-500 py-12">
+            <p>No rooms available at the moment</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {MOCK_ROOMS.map((room) => (
+            {rooms.map((room) => (
                 <div key={room.id} className="group bg-slate-900 rounded-xl overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all hover:shadow-2xl hover:shadow-indigo-900/20 flex flex-col">
                     <div className="relative aspect-video">
                         <img src={room.thumbnail} alt={room.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -55,6 +85,7 @@ export const BreakoutRooms: React.FC<BreakoutRoomsProps> = ({ onJoinRoom, lang }
                 </div>
             ))}
         </div>
+        )}
       </div>
     </div>
   );

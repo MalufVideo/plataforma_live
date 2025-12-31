@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StreamSource, Poll, Session, Survey, Language, Message, Question, Project } from '../types';
-import { TRANSLATIONS, INITIAL_POLL, INITIAL_SURVEY } from '../constants';
+import { TRANSLATIONS } from '../constants';
 import {
   ArrowLeft, Activity, LayoutDashboard, Radio, BarChart3,
   Server, MessageSquare, Settings, Crown, Wifi, Play, FolderKanban
@@ -12,14 +12,15 @@ import { TranscodingTab } from '../components/admin/TranscodingTab';
 import { EngagementTab } from '../components/admin/EngagementTab';
 import { ReportsTab } from '../components/admin/ReportsTab';
 import { ProjectsTab } from '../components/admin/ProjectsTab';
+import { ProjectGuestManagement } from '../components/admin/ProjectGuestManagement';
 
 interface AdminConsoleProps {
-  session: Session;
+  session: Session | null;
   currentSource: StreamSource;
   setSource: (s: StreamSource) => void;
   setYoutubeVideoId: (id: string) => void;
-  updatePoll: (p: Poll) => void;
-  updateSurvey: (s: Survey) => void;
+  updatePoll: (p: Poll | null) => void;
+  updateSurvey: (s: Survey | null) => void;
   messages: Message[];
   questions: Question[];
   lang: Language;
@@ -33,10 +34,11 @@ interface AdminConsoleProps {
   onUpdateProject: (project: Project) => void;
 }
 
-type AdminTab = 'projects' | 'dashboard' | 'sources' | 'analytics' | 'reports' | 'transcoding' | 'engagement' | 'settings';
+type AdminTab = 'projects' | 'guests' | 'dashboard' | 'sources' | 'analytics' | 'reports' | 'transcoding' | 'engagement' | 'settings';
 
-const TAB_CONFIG: { id: AdminTab; label: string; icon: React.ElementType; premium?: boolean }[] = [
+const TAB_CONFIG: { id: AdminTab; label: string; icon: React.ElementType; premium?: boolean; hidden?: boolean }[] = [
   { id: 'projects', label: 'Projects', icon: FolderKanban },
+  { id: 'guests', label: 'Guests', icon: MessageSquare, hidden: true }, // Hidden tab, accessed via project
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'sources', label: 'Stream Sources', icon: Radio },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -68,8 +70,21 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
   const [activeTab, setActiveTab] = useState<AdminTab>('projects');
   const [isPremium, setIsPremium] = useState(true); // Toggle for demo
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [poll, setPoll] = useState<Poll>(INITIAL_POLL);
-  const [survey, setSurvey] = useState<Survey>(INITIAL_SURVEY);
+  const [poll, setPoll] = useState<Poll | null>(null);
+  const [survey, setSurvey] = useState<Survey | null>(null);
+  const [guestManagementProjectId, setGuestManagementProjectId] = useState<string | null>(null);
+
+  // Handle navigating to guest management for a specific project
+  const handleManageGuests = (projectId: string) => {
+    setGuestManagementProjectId(projectId);
+    setActiveTab('guests');
+  };
+
+  // Handle going back from guest management
+  const handleBackFromGuests = () => {
+    setGuestManagementProjectId(null);
+    setActiveTab('projects');
+  };
 
   const t = TRANSLATIONS[lang].admin;
 
@@ -120,7 +135,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
                   </span>
                 )}
               </h1>
-              <p className="text-[10px] text-slate-500">{session.title}</p>
+              <p className="text-[10px] text-slate-500">{session?.title || 'No active project'}</p>
             </div>
           </div>
         </div>
@@ -157,7 +172,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
       {/* Tab Navigation */}
       <div className="bg-[#14151f] border-b border-slate-800 px-4">
         <nav className="flex gap-1">
-          {TAB_CONFIG.map((tab) => (
+          {TAB_CONFIG.filter(tab => !tab.hidden).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -188,12 +203,22 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
             onSelectProject={onSelectProject}
             onDeleteProject={onDeleteProject}
             onToggleOnDemand={onToggleOnDemand}
+            onManageGuests={handleManageGuests}
+            lang={lang}
+          />
+        )}
+
+        {activeTab === 'guests' && guestManagementProjectId && (
+          <ProjectGuestManagement
+            projectId={guestManagementProjectId}
+            project={projects.find(p => p.id === guestManagementProjectId) || null}
+            onBack={handleBackFromGuests}
             lang={lang}
           />
         )}
 
         {activeTab === 'dashboard' && (
-          <DashboardTab viewers={session.viewers} isPremium={isPremium} />
+          <DashboardTab viewers={session?.viewers || 0} isPremium={isPremium} />
         )}
 
         {activeTab === 'sources' && (
@@ -208,7 +233,7 @@ export const AdminConsole: React.FC<AdminConsoleProps> = ({
         )}
 
         {activeTab === 'analytics' && (
-          <AnalyticsTab isPremium={isPremium} viewers={session.viewers} />
+          <AnalyticsTab isPremium={isPremium} viewers={session?.viewers || 0} />
         )}
 
         {activeTab === 'reports' && (

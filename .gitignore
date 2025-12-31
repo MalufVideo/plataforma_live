@@ -33,3 +33,6 @@ token.json
 *.njsproj
 *.sln
 *.sw?
+
+# Auto Claude data directory
+.auto-claude/

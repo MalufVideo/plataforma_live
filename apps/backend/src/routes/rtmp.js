@@ -237,16 +237,52 @@ router.put('/ingest/:id/toggle', requireAdmin, async (req, res) => {
 });
 
 /**
+ * Middleware to verify internal RTMP server requests
+ * Uses a shared secret to authenticate internal calls
+ */
+const requireInternalAuth = (req, res, next) => {
+    const internalSecret = process.env.RTMP_INTERNAL_SECRET;
+    const providedSecret = req.headers['x-rtmp-internal-secret'];
+
+    // In development, allow requests if no secret is configured
+    if (process.env.NODE_ENV !== 'production' && !internalSecret) {
+        return next();
+    }
+
+    // In production, require the secret
+    if (!internalSecret) {
+        console.error('[RTMP] RTMP_INTERNAL_SECRET not configured');
+        return res.status(500).json({ valid: false, error: 'Server misconfiguration' });
+    }
+
+    // Check if request is from localhost (internal)
+    const clientIp = req.ip || req.connection.remoteAddress;
+    const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+
+    if (!isLocalhost && providedSecret !== internalSecret) {
+        console.log('[RTMP] Unauthorized validate request from:', clientIp);
+        return res.status(403).json({ valid: false, error: 'Access denied' });
+    }
+
+    next();
+};
+
+/**
  * POST /api/rtmp/validate
  * Validate a stream key (called by RTMP server internally)
- * This endpoint should be protected or internal-only in production
+ * Protected - only accepts requests from localhost or with internal secret
  */
-router.post('/validate', async (req, res) => {
+router.post('/validate', requireInternalAuth, async (req, res) => {
     try {
         const { streamKey } = req.body;
 
-        if (!streamKey) {
+        if (!streamKey || typeof streamKey !== 'string') {
             return res.status(400).json({ valid: false, error: 'Stream key is required' });
+        }
+
+        // Validate stream key format (hex string)
+        if (!/^[a-f0-9]{32}$/i.test(streamKey)) {
+            return res.json({ valid: false, error: 'Invalid stream key format' });
         }
 
         const { data, error } = await supabase

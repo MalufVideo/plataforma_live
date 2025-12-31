@@ -43,16 +43,21 @@ const corsOptions = {
     origin: (origin, callback) => {
         // Normalize origin by removing trailing slash
         const normalizedOrigin = origin ? origin.replace(/\/$/, '') : null;
-        // Allow requests with no origin (mobile apps, curl, etc.)
-        if (!normalizedOrigin) return callback(null, true);
+        // Allow requests with no origin (mobile apps, curl, etc.) only in development
+        if (!normalizedOrigin) {
+            if (process.env.NODE_ENV === 'production') {
+                return callback(new Error('Origin required in production'), false);
+            }
+            return callback(null, true);
+        }
         if (ALLOWED_ORIGINS.includes(normalizedOrigin)) {
             callback(null, true);
         } else {
             console.log('[CORS] Blocked origin:', origin);
-            callback(null, true); // Allow anyway for now, log for debugging
+            callback(new Error('Not allowed by CORS'), false);
         }
     },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true
 };
 
