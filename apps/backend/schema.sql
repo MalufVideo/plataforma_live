@@ -278,11 +278,42 @@ CREATE TABLE project_guests (
 -- =============================================
 
 -- Auto-create profile on auth.user creation
+-- This function handles both email/password signups AND OAuth signups (Google, etc.)
+-- Email/password signup provides: name, username in raw_user_meta_data
+-- Google OAuth provides: full_name, name, email, avatar_url, picture in raw_user_meta_data
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
+DECLARE
+  user_name TEXT;
+  user_avatar TEXT;
+  user_username TEXT;
 BEGIN
-  INSERT INTO public.profiles (id, email, name, username, role)
-  VALUES (new.id, new.email, new.raw_user_meta_data->>'name', new.raw_user_meta_data->>'username', 'ATTENDEE');
+  -- Get name: prefer 'name', then 'full_name' (Google OAuth)
+  user_name := COALESCE(
+    new.raw_user_meta_data->>'name',
+    new.raw_user_meta_data->>'full_name',
+    split_part(new.email, '@', 1)
+  );
+
+  -- Get avatar: check for avatar_url or picture (Google OAuth)
+  user_avatar := COALESCE(
+    new.raw_user_meta_data->>'avatar_url',
+    new.raw_user_meta_data->>'picture'
+  );
+
+  -- Get username from metadata (only set during email/password signup)
+  user_username := new.raw_user_meta_data->>'username';
+
+  INSERT INTO public.profiles (id, email, name, username, avatar, role)
+  VALUES (
+    new.id,
+    new.email,
+    user_name,
+    user_username,
+    user_avatar,
+    'ATTENDEE'
+  );
+
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
